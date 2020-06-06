@@ -21,7 +21,7 @@ typedef void (*fpLogger)(PCWSTR szMassage);
 
 class SimpleHttpServer {
 public:
-	SimpleHttpServer(const PCWSTR szUrl, DWORD dwPort, fpLogger);
+	SimpleHttpServer(const PCWSTR szDomainName, DWORD dwPort, fpLogger);
 	~SimpleHttpServer();
 	void fnStart();
 
@@ -33,7 +33,7 @@ private:
 	void fnSendResponse(std::wstring sTextToSend, LPVOID referenceRequest);
 
 	const DWORD m_dwPort;
-	const PCWSTR m_szUrl;
+	const PCWSTR m_szDomainName;
 	const PCWSTR m_DefaultMessage;
 	const fpLogger m_lpLoggerFunction;
 	const DWORD m_cbRequestMaxSize = 2048;

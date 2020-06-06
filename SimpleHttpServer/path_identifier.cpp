@@ -44,7 +44,7 @@ PWSTR convertCSTR(PCSTR sString, DWORD cbBytesInString)
 
 PWSTR PathIdentifier::readFile()
 {
-	const DWORD cbChunkSize=3;
+	const DWORD cbChunkSize=100;
 	DWORD cbBytesRead=0;
 	DWORD cbTotalBytesRead=0;
 	PCHAR offsetInBuffer;

@@ -1,9 +1,11 @@
 #include <time.h>
 #include<stdlib.h>
 #include <string>
+#include <strsafe.h>
 #include "simple_http_server.h"
 #include "path_identifier.h"
 
+PSTR renderUnicodeToByteStrHtml(PCWSTR originalUnicodeMessage);
 
 #define INITIALIZE_HTTP_RESPONSE( resp, status, reason )    \
     do                                                      \
@@ -25,14 +27,26 @@
 
 
 
-SimpleHttpServer::SimpleHttpServer(PCWSTR szUrl, DWORD dwPort, fpLogger lpLoggerFunction)
+PCWSTR formatDomainName(PCWSTR szDomainName, DWORD port)
+{
+    const DWORD cbSizeToHoldPortString = 5 * 2 ;
+    const PCWSTR pszDomainFormat = L"%ws:%d/";
+    const DWORD cbSizeToHoldFullDomainName = lstrlenW(szDomainName)  * 2
+                                             + cbSizeToHoldPortString
+                                             + 1;
+    STRSAFE_LPWSTR pszDomainString = (STRSAFE_LPWSTR)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, cbSizeToHoldFullDomainName); // up to d digits for port
+    StringCbPrintfW(pszDomainString, cbSizeToHoldFullDomainName, pszDomainFormat, szDomainName, port);
+    return pszDomainString;
+}
+
+SimpleHttpServer::SimpleHttpServer(PCWSTR szDomainName, DWORD dwPort, fpLogger lpLoggerFunction)
 	:m_dwPort(dwPort),
-	m_szUrl(szUrl),
+	m_szDomainName(formatDomainName(szDomainName, dwPort)),
     m_lpLoggerFunction(lpLoggerFunction),
     m_DefaultMessage(L"Not Found.")
 {
     if (fnSetupHttpServer() 
-        && fnRegisterUrl(m_szUrl))
+        && fnRegisterUrl(m_szDomainName))
     {
         m_lpLoggerFunction(L"[INFO] Server setup completed!");
     }
@@ -46,6 +60,8 @@ SimpleHttpServer::~SimpleHttpServer()
 	CloseHandle(m_RequestQueueHandle);
     HttpTerminate(HTTP_INITIALIZE_SERVER,
         NULL);
+    if (NULL != m_szDomainName)
+        HeapFree(GetProcessHeap(), 0, (LPVOID)m_szDomainName);
 }
 
 
@@ -84,7 +100,7 @@ void SimpleHttpServer::fnStart()
                 HeapFree(GetProcessHeap(), 0, (LPVOID)sTextResponse);
             }
             else
-            {
+            {              
                 fnSendResponse(m_DefaultMessage, lpRequestBuffer);
             }
 
@@ -137,16 +153,44 @@ BOOL SimpleHttpServer::fnRegisterUrl(PCWSTR szUrl) noexcept
     return TRUE;
 }
 
+PSTR renderUnicodeToByteStrHtml(PCWSTR originalUnicodeMessage)
+{
+    char htmlTemplate[60] = "<div class=\"text\"><pre>%ws</pre></div>";
+    DWORD cbSizeOfRenderedMessage =
+        lstrlenW(originalUnicodeMessage) * 2
+        + strlen(htmlTemplate) + 1;
+    
+    PCHAR rendered = (PCHAR)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 
+        cbSizeOfRenderedMessage);
+    if (NULL == rendered || NULL == originalUnicodeMessage)
+    {
+        return NULL;
+    }
+
+    StringCbPrintfA(rendered, cbSizeOfRenderedMessage, htmlTemplate, originalUnicodeMessage);
+    return rendered;
+}
+
 PCWSTR SimpleHttpServer::fnHandleRequest(LPVOID pDataStructure)
 {
     PHTTP_REQUEST pRequest = (PHTTP_REQUEST)pDataStructure;
+    PCWSTR unicodeData;
+    PSTR renderedResponse;
 
     switch (pRequest->Verb)
     {
+
         case HttpVerbGET:
             //HandleGet
             m_lpLoggerFunction(L"[INFO] Got Valid Http Request!");
-            return fnHandleRequestGet(pRequest); // this should return a vlaid response
+            unicodeData = fnHandleRequestGet(pRequest);
+            renderedResponse = renderUnicodeToByteStrHtml(unicodeData);
+            if (NULL == renderedResponse)
+            {
+                return NULL;
+            }
+            return (PCWSTR)renderedResponse;
+            
 
 
         default:
@@ -175,13 +219,12 @@ void SimpleHttpServer::fnSendResponse(std::wstring sTextToSend, LPVOID reference
     HTTP_DATA_CHUNK dataChunk;
     HTTP_RESPONSE  response;
     ULONG StatusCode = 200;
-
     INITIALIZE_HTTP_RESPONSE(&response, StatusCode, "OK");
     ADD_KNOWN_HEADER(response, HttpHeaderContentType, "text/html");
 
     dataChunk.DataChunkType = HttpDataChunkFromMemory;
     dataChunk.FromMemory.pBuffer = (PSTR)sTextToSend.c_str();
-    dataChunk.FromMemory.BufferLength =sTextToSend.size() * 2; 
+    dataChunk.FromMemory.BufferLength = sTextToSend.size() * 2; 
 
     response.EntityChunkCount = 1;
     response.pEntityChunks = &dataChunk;

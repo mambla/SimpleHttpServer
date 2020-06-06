@@ -20,7 +20,7 @@ int __cdecl wmain(
     wchar_t* argv[]
 )
 {
-	SimpleHttpServer myserver(L"http://127.0.0.1:80/", 80, tempLogger);
+	SimpleHttpServer myserver(L"http://127.0.0.1", 80, tempLogger);
     myserver.fnStart();
 
     
