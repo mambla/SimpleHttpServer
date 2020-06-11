@@ -4,8 +4,10 @@
 #include <strsafe.h>
 #include "simple_http_server.h"
 #include "path_identifier.h"
+#include <strsafe.h>
 
 PSTR renderUnicodeToByteStrHtml(PCWSTR originalUnicodeMessage);
+
 
 #define INITIALIZE_HTTP_RESPONSE( resp, status, reason )    \
     do                                                      \
@@ -39,16 +41,19 @@ PCWSTR formatDomainName(PCWSTR szDomainName, DWORD port)
     return pszDomainString;
 }
 
-SimpleHttpServer::SimpleHttpServer(PCWSTR szDomainName, DWORD dwPort, fpLogger lpLoggerFunction)
+SimpleHttpServer::SimpleHttpServer(PCWSTR szDomainName, DWORD dwPort, const PWSTR szServerRootPath, fpLogger lpLoggerFunction)
 	:m_dwPort(dwPort),
 	m_szDomainName(formatDomainName(szDomainName, dwPort)),
     m_lpLoggerFunction(lpLoggerFunction),
-    m_DefaultMessage(L"Not Found.")
+    m_DefaultMessage(L"Not Found."),
+    m_cbRequestMaxSize(2048),
+    m_serverRootPath(szServerRootPath)
 {
     if (fnSetupHttpServer() 
         && fnRegisterUrl(m_szDomainName))
     {
         m_lpLoggerFunction(L"[INFO] Server setup completed!");
+
     }
     else {
         m_lpLoggerFunction(L"[ERROR] Could not setup server");
@@ -171,6 +176,22 @@ PSTR renderUnicodeToByteStrHtml(PCWSTR originalUnicodeMessage)
     return rendered;
 }
 
+PCWSTR appendToBasePath(PCWSTR basePath, PCWSTR path)
+{
+    DWORD sizeOfPath; 
+    DWORD sizeOfBasePath;
+    StringCchLengthW(basePath, MAX_PATH, (size_t*)&sizeOfBasePath);
+    StringCchLengthW(basePath, MAX_PATH, (size_t*)&sizeOfPath);
+
+    DWORD totalSizeOfFullPathBuffer = (sizeOfBasePath + sizeOfPath + 1) * 2;
+    PCWSTR fullPathWithBase = (PCWSTR)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, totalSizeOfFullPathBuffer);
+    StringCbCatW((STRSAFE_LPWSTR)fullPathWithBase, totalSizeOfFullPathBuffer, basePath);
+    StringCbCatW((STRSAFE_LPWSTR)fullPathWithBase, totalSizeOfFullPathBuffer, path);
+    return fullPathWithBase;
+
+
+}
+
 PCWSTR SimpleHttpServer::fnHandleRequest(LPVOID pDataStructure)
 {
     PHTTP_REQUEST pRequest = (PHTTP_REQUEST)pDataStructure;
@@ -183,12 +204,14 @@ PCWSTR SimpleHttpServer::fnHandleRequest(LPVOID pDataStructure)
         case HttpVerbGET:
             //HandleGet
             m_lpLoggerFunction(L"[INFO] Got Valid Http Request!");
-            unicodeData = fnHandleRequestGet(pRequest);
-            renderedResponse = renderUnicodeToByteStrHtml(unicodeData);
-            if (NULL == renderedResponse)
+            unicodeData = fnHandleRequestGet(pRequest);        
+            if (NULL == unicodeData)
             {
                 return NULL;
             }
+
+            renderedResponse = renderUnicodeToByteStrHtml(unicodeData);
+            HeapFree(GetProcessHeap(), 0, (LPVOID)unicodeData);
             return (PCWSTR)renderedResponse;
             
 
@@ -202,13 +225,20 @@ PCWSTR SimpleHttpServer::fnHandleRequest(LPVOID pDataStructure)
 PCWSTR SimpleHttpServer::fnHandleRequestGet(LPVOID pDataStructure)
 {
     PHTTP_REQUEST pRequest = (PHTTP_REQUEST)pDataStructure;
-    std::wstring absPath(pRequest->CookedUrl.pAbsPath + 1
-                         ,pRequest->CookedUrl.AbsPathLength);
-    PathIdentifier pathReader(absPath);
+    //std::wstring absPath(pRequest->CookedUrl.pAbsPath + 1
+                         //,pRequest->CookedUrl.AbsPathLength);
+    PCWSTR fullPathToRead = appendToBasePath(m_serverRootPath, pRequest->CookedUrl.pAbsPath + 1);
+    PathIdentifier pathReader(fullPathToRead);
 
-    std::wstring massage = std::wstring(L"[INFO] got file/path show request: ") + absPath;
+    std::wstring massage = std::wstring(L"[INFO] got file/path show request: ") + std::wstring(fullPathToRead);
     m_lpLoggerFunction(massage.c_str());
     PCWSTR pszDataToReturn = pathReader.readNow();
+    
+    if (NULL != fullPathToRead)
+    {
+        HeapFree(GetProcessHeap(), 0, (LPVOID)fullPathToRead);
+    }
+
     return pszDataToReturn;
 }
 

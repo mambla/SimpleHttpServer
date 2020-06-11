@@ -20,7 +20,8 @@ int __cdecl wmain(
     wchar_t* argv[]
 )
 {
-	SimpleHttpServer myserver(L"http://127.0.0.1", 80, tempLogger);
+    const PWSTR serverRoot = (const PWSTR)L"C:\\Users\\amitb\\Downloads\\";
+	SimpleHttpServer myserver(L"http://127.0.0.1", 80, serverRoot, tempLogger);
     myserver.fnStart();
 
     

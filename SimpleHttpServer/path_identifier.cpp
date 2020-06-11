@@ -1,11 +1,11 @@
 #include "path_identifier.h"
 #include <strsafe.h>
 #include <iostream>
+#include <Windows.h>
 
-
-PathIdentifier::PathIdentifier(wstring absPath)
+PathIdentifier::PathIdentifier(wstring absPath, DWORD cbMaxSizeForData)
 	:m_absPath(absPath),
-	cbMaxSizeForData(2048)
+	m_cbMaxSizeForData(cbMaxSizeForData)
 {
 }
 
@@ -72,7 +72,7 @@ PWSTR PathIdentifier::readFile()
 			return NULL;
 		}
 
-		while ((cbTotalBytesRead < cbMaxSizeForData)
+		while ((cbTotalBytesRead < m_cbMaxSizeForData)
 			&&
 			(ReadFile(hfile,
 			buffer + cbTotalBytesRead,
@@ -119,7 +119,7 @@ PWSTR PathIdentifier::listDir()
 		lstrlenW(pszPathToSearchAsFolder ) + lstrlenW(L"\\*") + 1,
 		L"\\*"
 	);
-	PWCHAR dataBuffer = (PWCHAR)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, cbMaxSizeForData * 2);
+	PWCHAR dataBuffer = (PWCHAR)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, m_cbMaxSizeForData * 2);
 
 	if (NULL == dataBuffer)
 	{
@@ -141,7 +141,7 @@ PWSTR PathIdentifier::listDir()
 
 	
 	} while (FindNextFileW(hFirstFileInPath, &fileData) != 0
-		&& cbTotalWCharsCopied < cbMaxSizeForData);
+		&& cbTotalWCharsCopied < m_cbMaxSizeForData);
 	return (PWSTR)dataBuffer;
 }
 

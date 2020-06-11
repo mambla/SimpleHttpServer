@@ -9,7 +9,7 @@ using namespace std;
 class PathIdentifier
 {
 public:
-	PathIdentifier(wstring absPath);
+	PathIdentifier(wstring absPath, DWORD cbMaxSizeForData=2048);
 	PWSTR readNow();
 
 private:
@@ -17,6 +17,6 @@ private:
 	PWSTR listDir();
 
 	const wstring m_absPath;
-	const DWORD cbMaxSizeForData;
+	const DWORD m_cbMaxSizeForData;
 	const CHAR m_szDefaultDataToReturn[1] = "";
 };
