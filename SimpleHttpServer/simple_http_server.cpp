@@ -5,7 +5,7 @@
 #include "simple_http_server.h"
 #include "path_identifier.h"
 
-PSTR renderUnicodeToByteStrHtml(PCWSTR originalUnicodeMessage);
+PSTR renderUnicodeToHtmlByteStr(PCWSTR originalUnicodeMessage);
 
 #define INITIALIZE_HTTP_RESPONSE( resp, status, reason )    \
     do                                                      \
@@ -153,7 +153,7 @@ BOOL SimpleHttpServer::fnRegisterUrl(PCWSTR szUrl) noexcept
     return TRUE;
 }
 
-PSTR renderUnicodeToByteStrHtml(PCWSTR originalUnicodeMessage)
+PSTR renderUnicodeToHtmlByteStr(PCWSTR originalUnicodeMessage)
 {
     char htmlTemplate[60] = "<div class=\"text\"><pre>%ws</pre></div>";
     DWORD cbSizeOfRenderedMessage =
@@ -184,7 +184,7 @@ PCWSTR SimpleHttpServer::fnHandleRequest(LPVOID pDataStructure)
             //HandleGet
             m_lpLoggerFunction(L"[INFO] Got Valid Http Request!");
             unicodeData = fnHandleRequestGet(pRequest);
-            renderedResponse = renderUnicodeToByteStrHtml(unicodeData);
+            renderedResponse = renderUnicodeToHtmlByteStr(unicodeData);
             if (NULL == renderedResponse)
             {
                 return NULL;
