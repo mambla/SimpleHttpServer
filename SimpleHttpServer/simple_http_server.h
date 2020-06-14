@@ -21,23 +21,26 @@ typedef void (*fpLogger)(PCWSTR szMassage);
 
 class SimpleHttpServer {
 public:
-	SimpleHttpServer(const PCWSTR szDomainName, DWORD dwPort, const PWSTR szServerRootPath, fpLogger);
+	SimpleHttpServer(const PCWSTR szDomainName, DWORD dwPort, const PWSTR szServerRootPath, fpLogger lpfnLogger);
 	~SimpleHttpServer();
 	void fnStart();
 
 private:
 	BOOL fnSetupHttpServer();
-	BOOL fnRegisterUrl(PCWSTR szUrl)noexcept;
+	BOOL fnRegisterUrl(PCWSTR szUrl);
 	PCWSTR fnHandleRequest(LPVOID pRequest);
 	PCWSTR fnHandleRequestGet(LPVOID pRequest);
 	void fnSendResponse(std::wstring sTextToSend, LPVOID referenceRequest);
+	
+	void logInitializtionMessage();
 
+	BOOL isInitializedSuccessfully;
+	HANDLE m_RequestQueueHandle;
 	const DWORD m_dwPort;
 	const PCWSTR m_szDomainName;
-	const PCWSTR m_DefaultMessage;
-	const PCWSTR m_serverRootPath;
+	const PCWSTR m_szDefaultMessage;
+	const PCWSTR m_szServerRootPath;
 	const fpLogger m_lpLoggerFunction;
 	const DWORD m_cbRequestMaxSize;
-	HANDLE m_RequestQueueHandle;
 };
 

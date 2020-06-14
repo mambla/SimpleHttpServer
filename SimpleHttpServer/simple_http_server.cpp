@@ -4,10 +4,29 @@
 #include <strsafe.h>
 #include "simple_http_server.h"
 #include "path_identifier.h"
-#include <strsafe.h>
 
-PSTR renderUnicodeToByteStrHtml(PCWSTR originalUnicodeMessage);
+PSTR renderUnicodeToByteStrHtml(PCWSTR szOriginalUnicodeMessage);
+size_t fnGetWStringLength(PWSTR szString, size_t maxSize)
+{
+    size_t result;
+    HRESULT status = StringCbLengthW(szString, maxSize, &result);
+    if (S_OK == status)
+        return result;
+    else
+        return 0;
+}
 
+
+size_t fnGetWStringSize(PWSTR szString, size_t maxSize)
+{
+    return fnGetWStringLength(szString, maxSize) * sizeof(WCHAR);
+}
+
+
+LPVOID fnAllocate(SIZE_T cbBytes)
+{
+    return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, cbBytes);
+}
 
 #define INITIALIZE_HTTP_RESPONSE( resp, status, reason )    \
     do                                                      \
@@ -28,43 +47,38 @@ PSTR renderUnicodeToByteStrHtml(PCWSTR originalUnicodeMessage);
     } while(FALSE)
 
 
-
-PCWSTR formatDomainName(PCWSTR szDomainName, DWORD port)
+PCWSTR formatDomainName(PCWSTR szDomainName, DWORD dwPort)
 {
-    const DWORD cbSizeToHoldPortString = 5 * 2 ;
-    const PCWSTR pszDomainFormat = L"%ws:%d/";
-    const DWORD cbSizeToHoldFullDomainName = lstrlenW(szDomainName)  * 2
+    const DWORD cbSizeToHoldPortString = 5 * sizeof(WCHAR);
+    const PCWSTR szDomainFormat = L"%ws:%d/";
+    const DWORD cbSizeToHoldFullDomainName = fnGetWStringSize((PWSTR)szDomainName, MAX_PATH)
                                              + cbSizeToHoldPortString
                                              + 1;
-    STRSAFE_LPWSTR pszDomainString = (STRSAFE_LPWSTR)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, cbSizeToHoldFullDomainName); // up to d digits for port
-    StringCbPrintfW(pszDomainString, cbSizeToHoldFullDomainName, pszDomainFormat, szDomainName, port);
-    return pszDomainString;
+    STRSAFE_LPWSTR pszDomainString = (STRSAFE_LPWSTR)fnAllocate(cbSizeToHoldFullDomainName);
+    if (NULL != pszDomainString)
+    {
+        StringCbPrintfW(pszDomainString, cbSizeToHoldFullDomainName, szDomainFormat, szDomainName, dwPort);
+        return pszDomainString;
+    }
+
+    return NULL;
 }
 
-SimpleHttpServer::SimpleHttpServer(PCWSTR szDomainName, DWORD dwPort, const PWSTR szServerRootPath, fpLogger lpLoggerFunction)
+SimpleHttpServer::SimpleHttpServer(PCWSTR szDomainName, DWORD dwPort, const PWSTR szServerRootPath, fpLogger lpfnLoggerFunction)
 	:m_dwPort(dwPort),
 	m_szDomainName(formatDomainName(szDomainName, dwPort)),
-    m_lpLoggerFunction(lpLoggerFunction),
-    m_DefaultMessage(L"Not Found."),
+    m_lpLoggerFunction(lpfnLoggerFunction),
+    m_szDefaultMessage(L"Not Found."),
     m_cbRequestMaxSize(2048),
-    m_serverRootPath(szServerRootPath)
+    m_szServerRootPath(szServerRootPath)
 {
-    if (fnSetupHttpServer() 
-        && fnRegisterUrl(m_szDomainName))
-    {
-        m_lpLoggerFunction(L"[INFO] Server setup completed!");
-
-    }
-    else {
-        m_lpLoggerFunction(L"[ERROR] Could not setup server");
-    }
+    logInitializtionMessage();
 }
 
 SimpleHttpServer::~SimpleHttpServer()
 {
 	CloseHandle(m_RequestQueueHandle);
-    HttpTerminate(HTTP_INITIALIZE_SERVER,
-        NULL);
+    HttpTerminate(HTTP_INITIALIZE_SERVER, NULL);
     if (NULL != m_szDomainName)
         HeapFree(GetProcessHeap(), 0, (LPVOID)m_szDomainName);
 }
@@ -73,21 +87,28 @@ SimpleHttpServer::~SimpleHttpServer()
 
 void SimpleHttpServer::fnStart()
 {
+    if (!isInitializedSuccessfully) {
+        throw ServerInitilizationError();
+    }
+
     ULONG result;
     ULONG cbBytesReadFrom;
     DWORD cbSizeOfRequestBuffer = sizeof(HTTP_REQUEST) + m_cbRequestMaxSize;
-    PHTTP_REQUEST lpRequestBuffer = (HTTP_REQUEST*)HeapAlloc(
-        GetProcessHeap(),
-        HEAP_ZERO_MEMORY,
-        cbSizeOfRequestBuffer);
+    PHTTP_REQUEST lpRequestBuffer = (HTTP_REQUEST*)fnAllocate(cbSizeOfRequestBuffer);
 
+    if (NULL == lpRequestBuffer)
+    {
+        SetLastError(STATUS_NO_MEMORY);
+        return;
+    }
+    
     lpRequestBuffer->RequestId = HTTP_NULL_ID;
 
     while(TRUE)
     {
        result = HttpReceiveHttpRequest(
             m_RequestQueueHandle,
-            NULL,//figuree out
+            NULL,
             HTTP_RECEIVE_REQUEST_FLAG_COPY_BODY,
             lpRequestBuffer,
             cbSizeOfRequestBuffer,
@@ -106,7 +127,7 @@ void SimpleHttpServer::fnStart()
             }
             else
             {              
-                fnSendResponse(m_DefaultMessage, lpRequestBuffer);
+                fnSendResponse(m_szDefaultMessage, lpRequestBuffer);
             }
 
        }
@@ -143,8 +164,13 @@ BOOL SimpleHttpServer::fnSetupHttpServer()
 	return TRUE;
 }
 
-BOOL SimpleHttpServer::fnRegisterUrl(PCWSTR szUrl) noexcept
+BOOL SimpleHttpServer::fnRegisterUrl(PCWSTR szUrl) 
 {
+    if (NULL == szUrl)
+    {
+        return FALSE;
+    }
+
     ULONG retCode = HttpAddUrl(
         m_RequestQueueHandle,
         szUrl,
@@ -158,21 +184,20 @@ BOOL SimpleHttpServer::fnRegisterUrl(PCWSTR szUrl) noexcept
     return TRUE;
 }
 
-PSTR renderUnicodeToByteStrHtml(PCWSTR originalUnicodeMessage)
+PSTR renderUnicodeToByteStrHtml(PCWSTR szOriginalUnicodeMessage)
 {
     char htmlTemplate[60] = "<div class=\"text\"><pre>%ws</pre></div>";
     DWORD cbSizeOfRenderedMessage =
-        lstrlenW(originalUnicodeMessage) * 2
+        lstrlenW(szOriginalUnicodeMessage) * 2
         + strlen(htmlTemplate) + 1;
     
-    PCHAR rendered = (PCHAR)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 
-        cbSizeOfRenderedMessage);
-    if (NULL == rendered || NULL == originalUnicodeMessage)
+    PCHAR rendered = (PCHAR)fnAllocate(cbSizeOfRenderedMessage);
+    if (NULL == rendered || NULL == szOriginalUnicodeMessage)
     {
         return NULL;
     }
 
-    StringCbPrintfA(rendered, cbSizeOfRenderedMessage, htmlTemplate, originalUnicodeMessage);
+    StringCbPrintfA(rendered, cbSizeOfRenderedMessage, htmlTemplate, szOriginalUnicodeMessage);
     return rendered;
 }
 
@@ -184,7 +209,7 @@ PCWSTR appendToBasePath(PCWSTR basePath, PCWSTR path)
     StringCchLengthW(basePath, MAX_PATH, (size_t*)&sizeOfPath);
 
     DWORD totalSizeOfFullPathBuffer = (sizeOfBasePath + sizeOfPath + 1) * 2;
-    PCWSTR fullPathWithBase = (PCWSTR)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, totalSizeOfFullPathBuffer);
+    PCWSTR fullPathWithBase = (PCWSTR)fnAllocate(totalSizeOfFullPathBuffer);
     StringCbCatW((STRSAFE_LPWSTR)fullPathWithBase, totalSizeOfFullPathBuffer, basePath);
     StringCbCatW((STRSAFE_LPWSTR)fullPathWithBase, totalSizeOfFullPathBuffer, path);
     return fullPathWithBase;
@@ -227,7 +252,7 @@ PCWSTR SimpleHttpServer::fnHandleRequestGet(LPVOID pDataStructure)
     PHTTP_REQUEST pRequest = (PHTTP_REQUEST)pDataStructure;
     //std::wstring absPath(pRequest->CookedUrl.pAbsPath + 1
                          //,pRequest->CookedUrl.AbsPathLength);
-    PCWSTR fullPathToRead = appendToBasePath(m_serverRootPath, pRequest->CookedUrl.pAbsPath + 1);
+    PCWSTR fullPathToRead = appendToBasePath(m_szServerRootPath, pRequest->CookedUrl.pAbsPath + 1);
     PathIdentifier pathReader(fullPathToRead);
 
     std::wstring massage = std::wstring(L"[INFO] got file/path show request: ") + std::wstring(fullPathToRead);
@@ -284,4 +309,23 @@ void SimpleHttpServer::fnSendResponse(std::wstring sTextToSend, LPVOID reference
         m_lpLoggerFunction(L"[INFO] Response Sent Successfully!");
 
     }
+}
+
+
+void SimpleHttpServer::logInitializtionMessage()
+{
+    if (fnSetupHttpServer()
+        && fnRegisterUrl(m_szDomainName))
+    {
+        m_lpLoggerFunction(L"[INFO] Server setup completed!");
+        m_lpLoggerFunction(L"[INFO] Listening on:");
+        m_lpLoggerFunction(m_szDomainName);
+        isInitializedSuccessfully = TRUE;
+    }
+
+    else {
+        m_lpLoggerFunction(L"[ERROR] Could not setup server");
+        isInitializedSuccessfully = FALSE;
+    }
+    
 }
