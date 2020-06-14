@@ -1,7 +1,9 @@
+#pragma once
 #include "path_identifier.h"
 #include <strsafe.h>
 #include <iostream>
 #include <Windows.h>
+#include "Utils.h"
 
 PathIdentifier::PathIdentifier(wstring absPath, DWORD cbMaxSizeForData)
 	:m_absPath(absPath),
@@ -31,16 +33,6 @@ PWSTR PathIdentifier::readNow()
 }
 
 
-PWSTR convertCSTR(PCSTR sString, DWORD cbBytesInString)
-{
-	PWSTR sNewString = (PWSTR)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, cbBytesInString * 2);
-	for (size_t i = 0; i < cbBytesInString; i++)
-	{
-		sNewString[i] = (WCHAR)sString[i];
-	}
-	//HeapFree(GetProcessHeap(), 0, (void*)sString);
-	return sNewString;
-}
 
 PWSTR PathIdentifier::readFile()
 {
@@ -65,17 +57,18 @@ PWSTR PathIdentifier::readFile()
 
 	else
 	{
-		//check extantions
-		PCHAR buffer = (PCHAR)HeapAlloc(GetProcessHeap(), 0 , cbChunkSize);
-		if (NULL == buffer)
+		//TODO: check allowed extantions
+		PCHAR aBuffer = (PCHAR)fnAllocate(cbChunkSize);
+		if (NULL == aBuffer)
 		{
 			return NULL;
 		}
 
-		while ((cbTotalBytesRead < m_cbMaxSizeForData)
+		while (
+			(cbTotalBytesRead < m_cbMaxSizeForData)
 			&&
 			(ReadFile(hfile,
-			buffer + cbTotalBytesRead,
+			aBuffer + cbTotalBytesRead,
 			cbChunkSize,
 			&cbBytesRead,
 			NULL))
@@ -83,17 +76,23 @@ PWSTR PathIdentifier::readFile()
 		{
 			cbTotalBytesRead += cbBytesRead;
 
-			if (!cbBytesRead)
+			if (!cbBytesRead || NULL == aBuffer)
 			{
 				break;
 			}
-			buffer = (PCHAR)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY , buffer, cbTotalBytesRead + cbChunkSize);
+
+			aBuffer = (PCHAR)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY , aBuffer, cbTotalBytesRead + cbChunkSize);
+			
+			if(NULL == aBuffer)
+			{
+				return NULL;
+			}
 
 		}
 
 
 			CloseHandle(hfile);
-			return (PWSTR)convertCSTR((PCSTR)buffer, cbTotalBytesRead+1);
+			return (PWSTR)convertCSTR((PCSTR)aBuffer, cbTotalBytesRead+1);
 		
 
 		CloseHandle(hfile);
@@ -107,42 +106,43 @@ PWSTR PathIdentifier::readFile()
 PWSTR PathIdentifier::listDir()
 {
 	HANDLE hFirstFileInPath;
-	WCHAR lineResharper[] = L"\n";
+	WCHAR sLineSeperator[] = L"\n";
 	WIN32_FIND_DATAW fileData;
 	DWORD cbTotalWCharsCopied = 0;
-	wstring finalMessage;
+	wstring sFinalMessage;
 	DWORD cbChunkSize = 1024;
-	WCHAR pszPathToSearchAsFolder[MAX_PATH];
+	WCHAR aPathToSearchAsFolder[MAX_PATH];
 	
-	lstrcpyW(pszPathToSearchAsFolder, m_absPath.c_str());
-	StringCchCatW(pszPathToSearchAsFolder,
-		lstrlenW(pszPathToSearchAsFolder ) + lstrlenW(L"\\*") + 1,
+	StringCbCopyW(aPathToSearchAsFolder, MAX_PATH * sizeof(WCHAR), m_absPath.c_str());
+	StringCchCatW(aPathToSearchAsFolder,
+		fnGetWStringLength(aPathToSearchAsFolder, MAX_PATH) + fnGetWStringLength((PWSTR)L"\\*", MAX_PATH) + 1,
 		L"\\*"
 	);
-	PWCHAR dataBuffer = (PWCHAR)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, m_cbMaxSizeForData * 2);
 
-	if (NULL == dataBuffer)
+	PWCHAR aDataBuffer = (PWCHAR)fnAllocate(m_cbMaxSizeForData * 2);
+
+	if (NULL == aDataBuffer)
 	{
 		return NULL;
 	}
 
-	hFirstFileInPath = FindFirstFileW(pszPathToSearchAsFolder, &fileData);
+	hFirstFileInPath = FindFirstFileW(aPathToSearchAsFolder, &fileData);
 	if (INVALID_HANDLE_VALUE == hFirstFileInPath)
 	{
 		return NULL;
 	}
 	do {
-		DWORD cbLastFileNameLength = lstrlenW(fileData.cFileName);
+		DWORD cbLastFileNameLength = fnGetWStringLength(fileData.cFileName, m_cbMaxSizeForData);
 		cbTotalWCharsCopied += cbLastFileNameLength;
-		StringCchCatW(dataBuffer, cbTotalWCharsCopied + 1, fileData.cFileName);
+		StringCchCatW(aDataBuffer, cbTotalWCharsCopied + 1, fileData.cFileName);
 		
-		cbTotalWCharsCopied += lstrlenW(lineResharper);
-		StringCchCatW(dataBuffer, cbTotalWCharsCopied + 1, lineResharper);
+		cbTotalWCharsCopied += fnGetWStringLength(sLineSeperator, m_cbMaxSizeForData);
+		StringCchCatW(aDataBuffer, cbTotalWCharsCopied + 1, sLineSeperator);
 
 	
 	} while (FindNextFileW(hFirstFileInPath, &fileData) != 0
 		&& cbTotalWCharsCopied < m_cbMaxSizeForData);
-	return (PWSTR)dataBuffer;
+	return (PWSTR)aDataBuffer;
 }
 
 
