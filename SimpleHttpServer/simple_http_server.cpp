@@ -6,7 +6,7 @@
 #include "path_identifier.h"
 #include "Utils.h"
 
-PSTR renderUnicodeToByteStrHtml(PCWSTR szOriginalUnicodeMessage, size_t resultMaxSize);
+PCSTR renderUnicodeToByteStrHtml(PCWSTR szOriginalUnicodeMessage, size_t resultMaxSize);
 
 
 #define INITIALIZE_HTTP_RESPONSE( resp, status, reason )    \
@@ -35,7 +35,7 @@ PCWSTR formatDomainName(PCWSTR szDomainName, DWORD dwPort)
     const DWORD cbSizeToHoldFullDomainName = fnGetWStringSize((PWSTR)szDomainName, MAX_PATH)
                                              + cbSizeToHoldPortString
                                              + 1;
-    STRSAFE_LPWSTR pszDomainString = (STRSAFE_LPWSTR)fnAllocate(cbSizeToHoldFullDomainName);
+    STRSAFE_LPWSTR pszDomainString = reinterpret_cast<STRSAFE_LPWSTR>(fnAllocate(cbSizeToHoldFullDomainName));
     if (NULL != pszDomainString)
     {
         StringCbPrintfW(pszDomainString, cbSizeToHoldFullDomainName, szDomainFormat, szDomainName, dwPort);
@@ -75,7 +75,7 @@ void SimpleHttpServer::fnStart()
     ULONG result;
     ULONG cbBytesReadFrom;
     DWORD cbSizeOfRequestBuffer = sizeof(HTTP_REQUEST) + m_cbRequestMaxSize;
-    PHTTP_REQUEST lpRequestBuffer = (HTTP_REQUEST*)fnAllocate(cbSizeOfRequestBuffer);
+    PHTTP_REQUEST lpRequestBuffer = reinterpret_cast<HTTP_REQUEST*>(fnAllocate(cbSizeOfRequestBuffer));
 
     if (NULL == lpRequestBuffer)
     {
@@ -174,9 +174,10 @@ PCWSTR appendToBasePath(PCWSTR basePath, PCWSTR path)
     sizeOfPath = fnGetWStringLength((PWSTR)path, MAX_PATH);
 
     DWORD totalSizeOfFullPathBuffer = (sizeOfBasePath + sizeOfPath + 1) * 2;
-    PCWSTR fullPathWithBase = (PCWSTR)fnAllocate(totalSizeOfFullPathBuffer);
-    StringCbCatW((STRSAFE_LPWSTR)fullPathWithBase, totalSizeOfFullPathBuffer, basePath);
-    StringCbCatW((STRSAFE_LPWSTR)fullPathWithBase, totalSizeOfFullPathBuffer, path);
+    PWSTR fullPathWithBase = reinterpret_cast<PWSTR>(fnAllocate(totalSizeOfFullPathBuffer));
+    
+    StringCbCatW(static_cast<STRSAFE_LPWSTR>(fullPathWithBase), totalSizeOfFullPathBuffer, basePath);
+    StringCbCatW(const_cast<STRSAFE_LPWSTR>(fullPathWithBase), totalSizeOfFullPathBuffer, path);
     return fullPathWithBase;
 
 
@@ -184,9 +185,9 @@ PCWSTR appendToBasePath(PCWSTR basePath, PCWSTR path)
 
 PCWSTR SimpleHttpServer::fnHandleRequest(LPVOID pDataStructure)
 {
-    PHTTP_REQUEST pRequest = (PHTTP_REQUEST)pDataStructure;
+    PHTTP_REQUEST pRequest = reinterpret_cast<PHTTP_REQUEST>(pDataStructure);
     PCWSTR unicodeData;
-    PSTR renderedResponse;
+    PCSTR renderedResponse;
 
     switch (pRequest->Verb)
     {
@@ -200,9 +201,9 @@ PCWSTR SimpleHttpServer::fnHandleRequest(LPVOID pDataStructure)
                 return NULL;
             }
 
-            renderedResponse = renderUnicodeToByteStrHtml(unicodeData, m_cbRequestMaxSize);
+            renderedResponse = renderUnicodeToByteStrHtml(unicodeData, m_cbRequestMaxSize );
             HeapFree(GetProcessHeap(), 0, (LPVOID)unicodeData);
-            return (PCWSTR)renderedResponse;
+            return reinterpret_cast<PCWSTR>(renderedResponse);
             
 
 
@@ -214,13 +215,13 @@ PCWSTR SimpleHttpServer::fnHandleRequest(LPVOID pDataStructure)
 
 PCWSTR SimpleHttpServer::fnHandleRequestGet(LPVOID pDataStructure)
 {
-    PHTTP_REQUEST pRequest = (PHTTP_REQUEST)pDataStructure;;
+    PHTTP_REQUEST pRequest = reinterpret_cast<PHTTP_REQUEST>(pDataStructure);
     PCWSTR fullPathToRead = appendToBasePath(
-        m_szServerRootPath,
-        pRequest->CookedUrl.pAbsPath + 1); // ignore first '/'
+                                m_szServerRootPath,
+                                pRequest->CookedUrl.pAbsPath + 1); // ignore first '/'
     PathIdentifier pathReader(fullPathToRead);
-
-    std::wstring massage = std::wstring(L"[INFO] got file/path show request: ") + std::wstring(fullPathToRead);
+    std::wstring massage = std::wstring(L"[INFO] got file/path show request: ")
+                            + std::wstring(fullPathToRead);
     m_lpLoggerFunction(massage.c_str());
     PCWSTR pszDataToReturn = pathReader.readNow();
     
@@ -234,7 +235,7 @@ PCWSTR SimpleHttpServer::fnHandleRequestGet(LPVOID pDataStructure)
 
 void SimpleHttpServer::fnSendResponse(std::wstring sTextToSend, LPVOID referenceRequest)
 {
-    PHTTP_REQUEST pReferenceRequest = (PHTTP_REQUEST)referenceRequest;
+    PHTTP_REQUEST pReferenceRequest = reinterpret_cast<PHTTP_REQUEST>(referenceRequest);
     DWORD bytesSent;
     HTTP_DATA_CHUNK dataChunk;
     HTTP_RESPONSE  response;
@@ -295,19 +296,16 @@ void SimpleHttpServer::logInitializtionMessage()
 
 
 
-PSTR renderUnicodeToByteStrHtml(PCWSTR szOriginalUnicodeMessage, size_t resultMaxSize)
+PCSTR renderUnicodeToByteStrHtml(PCWSTR szOriginalUnicodeMessage, size_t resultMaxSize)
 {
-    CHAR szHtmlTemplate[60] = "<div class=\"text\"><pre>%ws</pre></div>";
-    DWORD cbSizeOfRenderedMessage =
-        fnGetWStringSize((PWSTR)szOriginalUnicodeMessage, resultMaxSize)
-        + strlen(szHtmlTemplate) + 1;
 
-    if (cbSizeOfRenderedMessage > resultMaxSize)
-    {
-        return NULL;
-    }
-    
-    PCHAR rendered = (PCHAR)fnAllocate(cbSizeOfRenderedMessage);
+    CHAR szHtmlTemplate[] = "<div class=\"text\"><pre>%ws</pre></div>";
+    DWORD cbSizeOfRenderedMessage =
+        fnGetWStringSize(szOriginalUnicodeMessage, resultMaxSize)
+        + sizeof(szHtmlTemplate) + 1;
+
+       
+    PCHAR rendered = reinterpret_cast<PCHAR>(fnAllocate(cbSizeOfRenderedMessage));
     if (NULL == rendered || NULL == szOriginalUnicodeMessage)
     {
         return NULL;

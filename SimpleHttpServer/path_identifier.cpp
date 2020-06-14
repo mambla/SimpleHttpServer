@@ -81,7 +81,7 @@ PWSTR PathIdentifier::readFile()
 				break;
 			}
 
-			aBuffer = (PCHAR)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY , aBuffer, cbTotalBytesRead + cbChunkSize);
+			aBuffer = reinterpret_cast<PCHAR>(HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY , aBuffer, cbTotalBytesRead + cbChunkSize));
 			
 			if(NULL == aBuffer)
 			{
@@ -92,7 +92,9 @@ PWSTR PathIdentifier::readFile()
 
 
 			CloseHandle(hfile);
-			return (PWSTR)convertCSTR((PCSTR)aBuffer, cbTotalBytesRead+1);
+			PWSTR sDataAsWideChar = reinterpret_cast<PWSTR>(convertCSTR(aBuffer, cbTotalBytesRead + 1));
+			HeapFree(GetProcessHeap(), 0, aBuffer);
+			return sDataAsWideChar;
 		
 
 		CloseHandle(hfile);
@@ -115,11 +117,12 @@ PWSTR PathIdentifier::listDir()
 	
 	StringCbCopyW(aPathToSearchAsFolder, MAX_PATH * sizeof(WCHAR), m_absPath.c_str());
 	StringCchCatW(aPathToSearchAsFolder,
-		fnGetWStringLength(aPathToSearchAsFolder, MAX_PATH) + fnGetWStringLength((PWSTR)L"\\*", MAX_PATH) + 1,
+		fnGetWStringLength(aPathToSearchAsFolder, MAX_PATH) 
+		+ fnGetWStringLength((PWSTR)L"\\*", MAX_PATH) + 1,
 		L"\\*"
 	);
 
-	PWCHAR aDataBuffer = (PWCHAR)fnAllocate(m_cbMaxSizeForData * 2);
+	PWCHAR aDataBuffer = reinterpret_cast<PWCHAR>(fnAllocate(m_cbMaxSizeForData));
 
 	if (NULL == aDataBuffer)
 	{
@@ -141,8 +144,8 @@ PWSTR PathIdentifier::listDir()
 
 	
 	} while (FindNextFileW(hFirstFileInPath, &fileData) != 0
-		&& cbTotalWCharsCopied < m_cbMaxSizeForData);
-	return (PWSTR)aDataBuffer;
+		&& cbTotalWCharsCopied * 2 < m_cbMaxSizeForData);
+	return aDataBuffer;
 }
 
 

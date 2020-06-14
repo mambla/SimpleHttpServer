@@ -1,6 +1,6 @@
 #include "Utils.h"
 
-size_t fnGetWStringLength(PWSTR szString, size_t maxSize)
+size_t fnGetWStringLength(PCWSTR szString, size_t maxSize)
 {
 	size_t result;
 	HRESULT status = StringCbLengthW(szString, maxSize, &result);
@@ -10,7 +10,7 @@ size_t fnGetWStringLength(PWSTR szString, size_t maxSize)
 		return 0;
 }
 
-size_t fnGetWStringSize(PWSTR szString, size_t maxSize)
+size_t fnGetWStringSize(PCWSTR szString, size_t maxSize)
 {
 	return fnGetWStringLength(szString, maxSize) * sizeof(WCHAR);
 }
@@ -32,6 +32,5 @@ PWSTR convertCSTR(PCSTR sString, DWORD cbBytesInString)
 	{
 		sNewString[i] = (WCHAR)sString[i];
 	}
-	//HeapFree(GetProcessHeap(), 0, (void*)sString);
 	return sNewString;
 }
