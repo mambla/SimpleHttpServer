@@ -17,7 +17,7 @@
 
 #include "http_exceptions.h"
 
-typedef void (*fpLogger)(PCWSTR szMassage);
+typedef void (* const fpLogger)(PCWSTR szMassage);
 
 class SimpleHttpServer {
 public:

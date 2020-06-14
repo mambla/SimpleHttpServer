@@ -5,7 +5,7 @@
 #include "simple_http_server.h"
 #include "path_identifier.h"
 
-PSTR renderUnicodeToByteStrHtml(PCWSTR szOriginalUnicodeMessage);
+PSTR renderUnicodeToByteStrHtml(PCWSTR szOriginalUnicodeMessage, size_t resultMaxSize);
 size_t fnGetWStringLength(PWSTR szString, size_t maxSize)
 {
     size_t result;
@@ -184,29 +184,13 @@ BOOL SimpleHttpServer::fnRegisterUrl(PCWSTR szUrl)
     return TRUE;
 }
 
-PSTR renderUnicodeToByteStrHtml(PCWSTR szOriginalUnicodeMessage)
-{
-    char htmlTemplate[60] = "<div class=\"text\"><pre>%ws</pre></div>";
-    DWORD cbSizeOfRenderedMessage =
-        lstrlenW(szOriginalUnicodeMessage) * 2
-        + strlen(htmlTemplate) + 1;
-    
-    PCHAR rendered = (PCHAR)fnAllocate(cbSizeOfRenderedMessage);
-    if (NULL == rendered || NULL == szOriginalUnicodeMessage)
-    {
-        return NULL;
-    }
-
-    StringCbPrintfA(rendered, cbSizeOfRenderedMessage, htmlTemplate, szOriginalUnicodeMessage);
-    return rendered;
-}
 
 PCWSTR appendToBasePath(PCWSTR basePath, PCWSTR path)
 {
     DWORD sizeOfPath; 
     DWORD sizeOfBasePath;
-    StringCchLengthW(basePath, MAX_PATH, (size_t*)&sizeOfBasePath);
-    StringCchLengthW(basePath, MAX_PATH, (size_t*)&sizeOfPath);
+    sizeOfBasePath = fnGetWStringLength((PWSTR)basePath, MAX_PATH);
+    sizeOfPath = fnGetWStringLength((PWSTR)path, MAX_PATH);
 
     DWORD totalSizeOfFullPathBuffer = (sizeOfBasePath + sizeOfPath + 1) * 2;
     PCWSTR fullPathWithBase = (PCWSTR)fnAllocate(totalSizeOfFullPathBuffer);
@@ -225,17 +209,17 @@ PCWSTR SimpleHttpServer::fnHandleRequest(LPVOID pDataStructure)
 
     switch (pRequest->Verb)
     {
-
         case HttpVerbGET:
             //HandleGet
             m_lpLoggerFunction(L"[INFO] Got Valid Http Request!");
             unicodeData = fnHandleRequestGet(pRequest);        
             if (NULL == unicodeData)
             {
+                m_lpLoggerFunction(L"[ERROR] Could not collect requested data!");
                 return NULL;
             }
 
-            renderedResponse = renderUnicodeToByteStrHtml(unicodeData);
+            renderedResponse = renderUnicodeToByteStrHtml(unicodeData, m_cbRequestMaxSize);
             HeapFree(GetProcessHeap(), 0, (LPVOID)unicodeData);
             return (PCWSTR)renderedResponse;
             
@@ -249,10 +233,10 @@ PCWSTR SimpleHttpServer::fnHandleRequest(LPVOID pDataStructure)
 
 PCWSTR SimpleHttpServer::fnHandleRequestGet(LPVOID pDataStructure)
 {
-    PHTTP_REQUEST pRequest = (PHTTP_REQUEST)pDataStructure;
-    //std::wstring absPath(pRequest->CookedUrl.pAbsPath + 1
-                         //,pRequest->CookedUrl.AbsPathLength);
-    PCWSTR fullPathToRead = appendToBasePath(m_szServerRootPath, pRequest->CookedUrl.pAbsPath + 1);
+    PHTTP_REQUEST pRequest = (PHTTP_REQUEST)pDataStructure;;
+    PCWSTR fullPathToRead = appendToBasePath(
+        m_szServerRootPath,
+        pRequest->CookedUrl.pAbsPath + 1); // ignore first '/'
     PathIdentifier pathReader(fullPathToRead);
 
     std::wstring massage = std::wstring(L"[INFO] got file/path show request: ") + std::wstring(fullPathToRead);
@@ -285,23 +269,21 @@ void SimpleHttpServer::fnSendResponse(std::wstring sTextToSend, LPVOID reference
     response.pEntityChunks = &dataChunk;
 
     DWORD result = HttpSendHttpResponse(
-        m_RequestQueueHandle,           // ReqQueueHandle
-        pReferenceRequest->RequestId, // Request ID
-        0,                   // Flags
-        &response,           // HTTP response
-        NULL,                // pReserved1
-        &bytesSent,          // bytes sent  (OPTIONAL)
-        NULL,                // pReserved2  (must be NULL)
-        0,                   // Reserved3   (must be 0)
-        NULL,                // LPOVERLAPPED(OPTIONAL)
-        NULL                 // pReserved4  (must be NULL)
+        m_RequestQueueHandle,
+        pReferenceRequest->RequestId,
+        0,
+        &response,
+        NULL,
+        &bytesSent,
+        NULL,
+        0,
+        NULL,
+        NULL
     );
 
     if (NO_ERROR != result)
     {
-        
         m_lpLoggerFunction(L"[ERROR] could not send the repsponse");
-
     }
 
     else
@@ -328,4 +310,28 @@ void SimpleHttpServer::logInitializtionMessage()
         isInitializedSuccessfully = FALSE;
     }
     
+}
+
+
+
+PSTR renderUnicodeToByteStrHtml(PCWSTR szOriginalUnicodeMessage, size_t resultMaxSize)
+{
+    CHAR szHtmlTemplate[60] = "<div class=\"text\"><pre>%ws</pre></div>";
+    DWORD cbSizeOfRenderedMessage =
+        fnGetWStringSize((PWSTR)szOriginalUnicodeMessage, resultMaxSize)
+        + strlen(szHtmlTemplate) + 1;
+
+    if (cbSizeOfRenderedMessage > resultMaxSize)
+    {
+        return NULL;
+    }
+    
+    PCHAR rendered = (PCHAR)fnAllocate(cbSizeOfRenderedMessage);
+    if (NULL == rendered || NULL == szOriginalUnicodeMessage)
+    {
+        return NULL;
+    }
+
+    StringCbPrintfA(rendered, cbSizeOfRenderedMessage, szHtmlTemplate, szOriginalUnicodeMessage);
+    return rendered;
 }
