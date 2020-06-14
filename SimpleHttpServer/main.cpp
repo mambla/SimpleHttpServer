@@ -10,7 +10,7 @@
 #include "simple_http_server.h"
 
 
-void tempLogger(PCWSTR szMessage)
+void ConsoleLogger(PCWSTR szMessage)
 {
     std::wcout << L"[LOG_MESSAGE] " << szMessage << std::endl;
 }
@@ -21,7 +21,7 @@ int __cdecl wmain(
 )
 {
     const PWSTR serverRoot = (const PWSTR)L"C:\\Users\\amitb\\Downloads\\";
-	SimpleHttpServer myserver(L"http://127.0.0.1", 80, serverRoot, tempLogger);
+	SimpleHttpServer myserver(L"http://127.0.0.1", 80, serverRoot, ConsoleLogger);
     myserver.fnStart();
 
     
