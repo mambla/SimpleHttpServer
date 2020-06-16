@@ -22,7 +22,7 @@ LPVOID fnAllocate(SIZE_T cbBytes)
 
 PWSTR convertCSTR(PCSTR sString, DWORD cbBytesInString)
 {
-	PWSTR sNewString = (PWSTR)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, cbBytesInString * 2);
+	PWSTR sNewString = static_cast<PWSTR>(HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, cbBytesInString * 2));
 	if (NULL == sNewString)
 	{
 		return NULL;

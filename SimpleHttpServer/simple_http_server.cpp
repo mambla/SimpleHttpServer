@@ -35,7 +35,7 @@ PCWSTR formatDomainName(PCWSTR szDomainName, DWORD dwPort)
     const DWORD cbSizeToHoldFullDomainName = fnGetWStringSize((PWSTR)szDomainName, MAX_PATH)
                                              + cbSizeToHoldPortString
                                              + 1;
-    STRSAFE_LPWSTR pszDomainString = reinterpret_cast<STRSAFE_LPWSTR>(fnAllocate(cbSizeToHoldFullDomainName));
+    STRSAFE_LPWSTR pszDomainString = static_cast<STRSAFE_LPWSTR>(fnAllocate(cbSizeToHoldFullDomainName));
     if (NULL != pszDomainString)
     {
         StringCbPrintfW(pszDomainString, cbSizeToHoldFullDomainName, szDomainFormat, szDomainName, dwPort);
@@ -45,7 +45,7 @@ PCWSTR formatDomainName(PCWSTR szDomainName, DWORD dwPort)
     return NULL;
 }
 
-SimpleHttpServer::SimpleHttpServer(PCWSTR szDomainName, DWORD dwPort, const PWSTR szServerRootPath, fpLogger lpfnLoggerFunction)
+SimpleHttpServer::SimpleHttpServer(PCWSTR szDomainName, DWORD dwPort, PCWSTR szServerRootPath, fpLogger lpfnLoggerFunction)
 	:m_dwPort(dwPort),
 	m_szDomainName(formatDomainName(szDomainName, dwPort)),
     m_lpLoggerFunction(lpfnLoggerFunction),
@@ -53,15 +53,46 @@ SimpleHttpServer::SimpleHttpServer(PCWSTR szDomainName, DWORD dwPort, const PWST
     m_cbRequestMaxSize(2048),
     m_szServerRootPath(szServerRootPath)
 {
+    
+    isInitializedSuccessfully = fnSetupHttpServer() && fnRegisterUrl(m_szDomainName);
     logInitializtionMessage();
+}
+
+SimpleHttpServer::SimpleHttpServer(SimpleHttpServer&& other)
+:m_cbRequestMaxSize(other.m_cbRequestMaxSize),
+m_dwPort(other.m_dwPort),
+m_szDomainName(m_szDomainName),
+m_szDefaultMessage(m_szDefaultMessage),
+m_szServerRootPath(m_szServerRootPath),
+m_lpLoggerFunction(m_lpLoggerFunction)
+{
+    m_RequestQueueHandle = other.m_RequestQueueHandle;
+    other.m_RequestQueueHandle = INVALID_HANDLE_VALUE;
+    other.shutDown();
+    
+}
+
+SimpleHttpServer& SimpleHttpServer::operator=(SimpleHttpServer&& other)
+{
+    DWORD* pToConst = const_cast<DWORD*>(&(this->m_cbRequestMaxSize));
+    /*m_dwPort(other.m_dwPort);
+        m_szDomainName(m_szDomainName),
+        m_szDefaultMessage(m_szDefaultMessage),
+        m_szServerRootPath(m_szServerRootPath),
+        m_lpLoggerFunction(m_lpLoggerFunction)*/
+    *pToConst = other.m_cbRequestMaxSize;
+    m_RequestQueueHandle = other.m_RequestQueueHandle;
+    other.m_RequestQueueHandle = INVALID_HANDLE_VALUE;
+    other.shutDown();
+    return *this;
 }
 
 SimpleHttpServer::~SimpleHttpServer()
 {
 	CloseHandle(m_RequestQueueHandle);
-    HttpTerminate(HTTP_INITIALIZE_SERVER, NULL);
     if (NULL != m_szDomainName)
         HeapFree(GetProcessHeap(), 0, (LPVOID)m_szDomainName);
+    shutDown();
 }
 
 
@@ -75,7 +106,7 @@ void SimpleHttpServer::fnStart()
     ULONG result;
     ULONG cbBytesReadFrom;
     DWORD cbSizeOfRequestBuffer = sizeof(HTTP_REQUEST) + m_cbRequestMaxSize;
-    PHTTP_REQUEST lpRequestBuffer = reinterpret_cast<HTTP_REQUEST*>(fnAllocate(cbSizeOfRequestBuffer));
+    PHTTP_REQUEST lpRequestBuffer = static_cast<HTTP_REQUEST*>(fnAllocate(cbSizeOfRequestBuffer));
 
     if (NULL == lpRequestBuffer)
     {
@@ -145,7 +176,7 @@ BOOL SimpleHttpServer::fnSetupHttpServer()
 	return TRUE;
 }
 
-BOOL SimpleHttpServer::fnRegisterUrl(PCWSTR szUrl) 
+BOOL SimpleHttpServer::fnRegisterUrl(PCWSTR szUrl) const
 {
     if (NULL == szUrl)
     {
@@ -174,10 +205,10 @@ PCWSTR appendToBasePath(PCWSTR basePath, PCWSTR path)
     sizeOfPath = fnGetWStringLength((PWSTR)path, MAX_PATH);
 
     DWORD totalSizeOfFullPathBuffer = (sizeOfBasePath + sizeOfPath + 1) * 2;
-    PWSTR fullPathWithBase = reinterpret_cast<PWSTR>(fnAllocate(totalSizeOfFullPathBuffer));
+    PWSTR fullPathWithBase = static_cast<PWSTR>(fnAllocate(totalSizeOfFullPathBuffer));
     
     StringCbCatW(static_cast<STRSAFE_LPWSTR>(fullPathWithBase), totalSizeOfFullPathBuffer, basePath);
-    StringCbCatW(const_cast<STRSAFE_LPWSTR>(fullPathWithBase), totalSizeOfFullPathBuffer, path);
+    StringCbCatW(static_cast<STRSAFE_LPWSTR>(fullPathWithBase), totalSizeOfFullPathBuffer, path);
     return fullPathWithBase;
 
 
@@ -276,22 +307,24 @@ void SimpleHttpServer::fnSendResponse(std::wstring sTextToSend, LPVOID reference
 }
 
 
-void SimpleHttpServer::logInitializtionMessage()
+void SimpleHttpServer::logInitializtionMessage()const
 {
-    if (fnSetupHttpServer()
-        && fnRegisterUrl(m_szDomainName))
+    if(isInitializedSuccessfully)
     {
         m_lpLoggerFunction(L"[INFO] Server setup completed!");
         m_lpLoggerFunction(L"[INFO] Listening on:");
         m_lpLoggerFunction(m_szDomainName);
-        isInitializedSuccessfully = TRUE;
     }
 
     else {
         m_lpLoggerFunction(L"[ERROR] Could not setup server");
-        isInitializedSuccessfully = FALSE;
     }
     
+}
+
+void SimpleHttpServer::shutDown()
+{
+    HttpTerminate(HTTP_INITIALIZE_SERVER, NULL);
 }
 
 
@@ -305,7 +338,7 @@ PCSTR renderUnicodeToByteStrHtml(PCWSTR szOriginalUnicodeMessage, size_t resultM
         + sizeof(szHtmlTemplate) + 1;
 
        
-    PCHAR rendered = reinterpret_cast<PCHAR>(fnAllocate(cbSizeOfRenderedMessage));
+    PCHAR rendered = static_cast<PCHAR>(fnAllocate(cbSizeOfRenderedMessage));
     if (NULL == rendered || NULL == szOriginalUnicodeMessage)
     {
         return NULL;

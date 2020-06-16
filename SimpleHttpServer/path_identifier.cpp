@@ -34,7 +34,7 @@ PWSTR PathIdentifier::readNow()
 
 
 
-PWSTR PathIdentifier::readFile()
+PWSTR PathIdentifier::readFile()const
 {
 	const DWORD cbChunkSize=100;
 	DWORD cbBytesRead=0;
@@ -58,7 +58,7 @@ PWSTR PathIdentifier::readFile()
 	else
 	{
 		//TODO: check allowed extantions
-		PCHAR aBuffer = (PCHAR)fnAllocate(cbChunkSize);
+		PCHAR aBuffer = static_cast<PCHAR>(fnAllocate(cbChunkSize));
 		if (NULL == aBuffer)
 		{
 			return NULL;
@@ -81,7 +81,7 @@ PWSTR PathIdentifier::readFile()
 				break;
 			}
 
-			aBuffer = reinterpret_cast<PCHAR>(HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY , aBuffer, cbTotalBytesRead + cbChunkSize));
+			aBuffer = static_cast<PCHAR>(HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY , aBuffer, cbTotalBytesRead + cbChunkSize));
 			
 			if(NULL == aBuffer)
 			{
@@ -92,7 +92,7 @@ PWSTR PathIdentifier::readFile()
 
 
 			CloseHandle(hfile);
-			PWSTR sDataAsWideChar = reinterpret_cast<PWSTR>(convertCSTR(aBuffer, cbTotalBytesRead + 1));
+			PWSTR sDataAsWideChar = static_cast<PWSTR>(convertCSTR(aBuffer, cbTotalBytesRead + 1));
 			HeapFree(GetProcessHeap(), 0, aBuffer);
 			return sDataAsWideChar;
 		
@@ -105,7 +105,7 @@ PWSTR PathIdentifier::readFile()
 
 }
 
-PWSTR PathIdentifier::listDir()
+PWSTR PathIdentifier::listDir()const
 {
 	HANDLE hFirstFileInPath;
 	WCHAR sLineSeperator[] = L"\n";

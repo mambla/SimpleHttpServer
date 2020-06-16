@@ -13,8 +13,8 @@ public:
 	PWSTR readNow();
 
 private:
-	PWSTR readFile();
-	PWSTR listDir();
+	PWSTR readFile()const;
+	PWSTR listDir()const;
 
 	const wstring m_absPath;
 	const DWORD m_cbMaxSizeForData;
