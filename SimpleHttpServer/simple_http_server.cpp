@@ -72,20 +72,6 @@ m_lpLoggerFunction(m_lpLoggerFunction)
     
 }
 
-SimpleHttpServer& SimpleHttpServer::operator=(SimpleHttpServer&& other)
-{
-    DWORD* pToConst = const_cast<DWORD*>(&(this->m_cbRequestMaxSize));
-    /*m_dwPort(other.m_dwPort);
-        m_szDomainName(m_szDomainName),
-        m_szDefaultMessage(m_szDefaultMessage),
-        m_szServerRootPath(m_szServerRootPath),
-        m_lpLoggerFunction(m_lpLoggerFunction)*/
-    *pToConst = other.m_cbRequestMaxSize;
-    m_RequestQueueHandle = other.m_RequestQueueHandle;
-    other.m_RequestQueueHandle = INVALID_HANDLE_VALUE;
-    other.shutDown();
-    return *this;
-}
 
 SimpleHttpServer::~SimpleHttpServer()
 {
