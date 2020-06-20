@@ -7,12 +7,30 @@
 #include <Windows.h>
 #include <strsafe.h>
 #include <string.h>
+#include <signal.h>
 #include "simple_http_server.h"
+#include "Utils.h"
 
+DestroyObjectOnCall signalHandlerGlobal;
+SimpleHttpServer* myServerGlobal=NULL;
 
 void ConsoleLogger(PCWSTR szMessage)
 {
     std::wcout << L"[LOG_MESSAGE] " << szMessage << std::endl;
+}
+
+void SignalHandler(int signal)
+{
+    if (signal == SIGINT) {
+        if (NULL != myServerGlobal)
+        {
+            myServerGlobal->setIsRuningSwitch(FALSE);
+        }
+    }
+    else {
+        std::cout << "Other Signal" << std::endl;
+
+    }
 }
 
 int __cdecl wmain(
@@ -20,9 +38,16 @@ int __cdecl wmain(
     wchar_t* argv[]
 )
 {
-    PCWSTR serverRoot = const_cast<PCWSTR>(L"C:\\Users\\amitb\\\Downloads\\");
-	SimpleHttpServer myserver(L"http://127.0.0.1", 80, serverRoot, ConsoleLogger);
-    myserver.fnStart();
-
+    typedef void (*SignalHandlerPointer)(int);
+    SignalHandlerPointer previousHandler;
+    {
+        PCWSTR serverRoot = const_cast<PCWSTR>(L"C:\\Users\\amitb\\\Downloads\\");
+        SimpleHttpServer myserver(L"http://127.0.0.1", 80, serverRoot, ConsoleLogger);
+        ::myServerGlobal = &myserver;
+        previousHandler = signal(SIGINT, SignalHandler);
+        myserver.fnStart();
+    end:
+        (void)0;
+    }
     
 }

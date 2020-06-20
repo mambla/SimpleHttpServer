@@ -26,16 +26,17 @@ public:
 	SimpleHttpServer& operator=(const SimpleHttpServer& other) = delete;
 
 	explicit SimpleHttpServer(SimpleHttpServer&& other);
-	SimpleHttpServer& operator=(SimpleHttpServer&& other);
+	SimpleHttpServer& operator=(SimpleHttpServer&& other)=delete;
 	~SimpleHttpServer();
 	void fnStart();
+	void setIsRuningSwitch(BOOL isNeedToRun);
 
 private:
 	BOOL fnSetupHttpServer();
 	BOOL fnRegisterUrl(PCWSTR szUrl)const;
 	PCWSTR fnHandleRequest(LPVOID pRequest);
 	PCWSTR fnHandleRequestGet(LPVOID pRequest);
-	void fnSendResponse(std::wstring sTextToSend, LPVOID referenceRequest);
+	void fnSendResponse(PCWSTR sTextToSend, LPVOID referenceRequest);
 	void logInitializtionMessage()const;
 	void shutDown();
 
@@ -47,5 +48,6 @@ private:
 	const PCWSTR m_szServerRootPath;
 	const fpLogger m_lpLoggerFunction;
 	const DWORD m_cbRequestMaxSize;
+	BOOL m_isRuning;
 };
 

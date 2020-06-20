@@ -6,8 +6,20 @@
 #include "path_identifier.h"
 #include "Utils.h"
 
+#define UNLIMITED_STRING 1024*1024
 PCSTR renderUnicodeToByteStrHtml(PCWSTR szOriginalUnicodeMessage, size_t resultMaxSize);
 
+typedef struct CHUNKS_DATA
+{
+    PHTTP_DATA_CHUNK chunkArray;
+    DWORD numberOfChunks;
+}CHUNKS_DATA;
+
+void fnFreeDataChunks(CHUNKS_DATA& data_chunks)
+{
+    data_chunks.numberOfChunks = 0;
+    fnFree(data_chunks.chunkArray);
+}
 
 #define INITIALIZE_HTTP_RESPONSE( resp, status, reason )    \
     do                                                      \
@@ -75,10 +87,12 @@ m_lpLoggerFunction(m_lpLoggerFunction)
 
 SimpleHttpServer::~SimpleHttpServer()
 {
+    m_lpLoggerFunction(L"[INFO] Closing the server...");
 	CloseHandle(m_RequestQueueHandle);
     if (NULL != m_szDomainName)
         HeapFree(GetProcessHeap(), 0, (LPVOID)m_szDomainName);
     shutDown();
+
 }
 
 
@@ -101,8 +115,8 @@ void SimpleHttpServer::fnStart()
     }
     
     lpRequestBuffer->RequestId = HTTP_NULL_ID;
-
-    while(TRUE)
+    m_isRuning = TRUE;
+    while(m_isRuning)
     {
        result = HttpReceiveHttpRequest(
             m_RequestQueueHandle,
@@ -113,6 +127,8 @@ void SimpleHttpServer::fnStart()
             &cbBytesReadFrom,
             NULL
         );
+       if (!m_isRuning) { break; }
+
        if (NO_ERROR == result)
        {
          //hnadle request
@@ -120,6 +136,7 @@ void SimpleHttpServer::fnStart()
                 fnHandleRequest((PHTTP_REQUEST)lpRequestBuffer);
 
             if (NULL != sTextResponse) {
+                //fnSendAsResponseFregmented(sTextResponse, lpRequestBuffer);
                 fnSendResponse(sTextResponse, lpRequestBuffer);
                 HeapFree(GetProcessHeap(), 0, (LPVOID)sTextResponse);
             }
@@ -133,6 +150,11 @@ void SimpleHttpServer::fnStart()
     }
 
     HeapFree(GetProcessHeap(), 0, lpRequestBuffer);
+}
+
+void SimpleHttpServer::setIsRuningSwitch(BOOL isNeedToRun)
+{
+    m_isRuning = isNeedToRun;
 }
 
 BOOL SimpleHttpServer::fnSetupHttpServer()
@@ -218,7 +240,7 @@ PCWSTR SimpleHttpServer::fnHandleRequest(LPVOID pDataStructure)
                 return NULL;
             }
 
-            renderedResponse = renderUnicodeToByteStrHtml(unicodeData, m_cbRequestMaxSize );
+            renderedResponse = renderUnicodeToByteStrHtml(unicodeData, UNLIMITED_STRING);
             HeapFree(GetProcessHeap(), 0, (LPVOID)unicodeData);
             return reinterpret_cast<PCWSTR>(renderedResponse);
             
@@ -236,7 +258,7 @@ PCWSTR SimpleHttpServer::fnHandleRequestGet(LPVOID pDataStructure)
     PCWSTR fullPathToRead = appendToBasePath(
                                 m_szServerRootPath,
                                 pRequest->CookedUrl.pAbsPath + 1); // ignore first '/'
-    PathIdentifier pathReader(fullPathToRead);
+    PathIdentifier pathReader(fullPathToRead, UNLIMITED_STRING);
     std::wstring massage = std::wstring(L"[INFO] got file/path show request: ")
                             + std::wstring(fullPathToRead);
     m_lpLoggerFunction(massage.c_str());
@@ -250,27 +272,57 @@ PCWSTR SimpleHttpServer::fnHandleRequestGet(LPVOID pDataStructure)
     return pszDataToReturn;
 }
 
-void SimpleHttpServer::fnSendResponse(std::wstring sTextToSend, LPVOID referenceRequest)
+
+CHUNKS_DATA fnGetResponseChunks(PCSTR dataToSend, DWORD dwDataSize, DWORD dwSizeForChunk)
+{
+    DWORD dwNumberOfChunks = ceil((double)dwDataSize / dwSizeForChunk); //round up
+    DWORD cbSizeOfLastChunk = dwDataSize % dwSizeForChunk;
+    PCSTR pToNextChunk = dataToSend;
+    PHTTP_DATA_CHUNK chunks = (PHTTP_DATA_CHUNK)fnAllocate(sizeof(HTTP_DATA_CHUNK) * dwNumberOfChunks);
+    if (NULL != chunks)
+    {
+        for (size_t i = 0; i < dwNumberOfChunks; i++, pToNextChunk += dwSizeForChunk)
+        {
+            chunks[i].DataChunkType = HttpDataChunkFromMemory;
+            chunks[i].FromMemory.pBuffer = (PVOID)pToNextChunk;
+            chunks[i].FromMemory.BufferLength = dwSizeForChunk;
+        }
+    }
+    //set last chunk size
+    if (NULL != chunks)
+    {
+        chunks[dwNumberOfChunks - 1].FromMemory.BufferLength = cbSizeOfLastChunk;
+    }
+
+    return CHUNKS_DATA{ chunks, dwNumberOfChunks};
+
+}
+
+void SimpleHttpServer::fnSendResponse(PCWSTR sTextToSend, LPVOID referenceRequest)
 {
     PHTTP_REQUEST pReferenceRequest = reinterpret_cast<PHTTP_REQUEST>(referenceRequest);
     DWORD bytesSent;
-    HTTP_DATA_CHUNK dataChunk;
     HTTP_RESPONSE  response;
+    CHUNKS_DATA chunks_data = fnGetResponseChunks(reinterpret_cast<PCSTR>(sTextToSend),
+        fnGetWStringSize(sTextToSend, UNLIMITED_STRING),
+        m_cbRequestMaxSize);
     ULONG StatusCode = 200;
     INITIALIZE_HTTP_RESPONSE(&response, StatusCode, "OK");
     ADD_KNOWN_HEADER(response, HttpHeaderContentType, "text/html");
 
-    dataChunk.DataChunkType = HttpDataChunkFromMemory;
-    dataChunk.FromMemory.pBuffer = (PSTR)sTextToSend.c_str();
-    dataChunk.FromMemory.BufferLength = sTextToSend.size() * 2; 
+    if (NULL == chunks_data.numberOfChunks)
+    {
+        fnFreeDataChunks(chunks_data);
+        return;
+    }
 
-    response.EntityChunkCount = 1;
-    response.pEntityChunks = &dataChunk;
+    response.EntityChunkCount = chunks_data.numberOfChunks;
+    response.pEntityChunks = chunks_data.chunkArray;
 
     DWORD result = HttpSendHttpResponse(
         m_RequestQueueHandle,
         pReferenceRequest->RequestId,
-        0,
+        HTTP_SEND_RESPONSE_FLAG_MORE_DATA,
         &response,
         NULL,
         &bytesSent,
@@ -279,6 +331,8 @@ void SimpleHttpServer::fnSendResponse(std::wstring sTextToSend, LPVOID reference
         NULL,
         NULL
     );
+    
+    fnFreeDataChunks(chunks_data);
 
     if (NO_ERROR != result)
     {
@@ -291,6 +345,7 @@ void SimpleHttpServer::fnSendResponse(std::wstring sTextToSend, LPVOID reference
 
     }
 }
+
 
 
 void SimpleHttpServer::logInitializtionMessage()const
