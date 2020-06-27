@@ -2,13 +2,6 @@
 #include <exception>
 
 
-void add_string_to_vector(const std::wstring& str, std::vector<char>& buffer, unsigned int offset)
-{
-	CopyMemory(
-		buffer.data() + offset,
-		str.data(),
-		str.size() * sizeof(WCHAR));
-}
 
 DirectroyIterator::DirectroyIterator(const std::wstring& path)
 	:_hfind(get_find_handler(path)),

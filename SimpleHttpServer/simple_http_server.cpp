@@ -7,7 +7,7 @@
 #include "Utils.h"
 
 #define UNLIMITED_STRING 1024*1024
-PCSTR renderUnicodeToByteStrHtml(PCWSTR szOriginalUnicodeMessage, size_t resultMaxSize);
+PCSTR renderUnicodeToByteStrHtml(const std::wstring& szOriginalUnicodeMessage, size_t resultMaxSize);
 
 typedef struct CHUNKS_DATA
 {
@@ -388,11 +388,18 @@ void SimpleHttpServer::shutDown()
 
 
 
-PCSTR renderUnicodeToByteStrHtml(PCWSTR szOriginalUnicodeMessage, size_t resultMaxSize)
+PCSTR renderUnicodeToByteStrHtml(const std::wstring& szOriginalUnicodeMessage, size_t resultMaxSize)
 {
-
-    CHAR szHtmlTemplate[] = "<div class=\"text\"><pre>%ws</pre></div>";
-    DWORD cbSizeOfRenderedMessage =
+    std::string html_template_start = "<div class=\"text\"><pre>";
+    std::string html_template_end = "</pre></div>";
+    size_t size_of_rendered_nmessage =
+        szOriginalUnicodeMessage.size() * sizeof(WCHAR)
+        + html_template_end.size()
+        + html_template_start.size();
+    std::vector<char> buffer(size_of_rendered_nmessage);
+    //html_template_start + szOriginalUnicodeMessage 
+    return buffer.data();
+    /*DWORD cbSizeOfRenderedMessage =
         fnGetWStringSize(szOriginalUnicodeMessage, resultMaxSize)
         + sizeof(szHtmlTemplate) + 1;
 
@@ -404,5 +411,5 @@ PCSTR renderUnicodeToByteStrHtml(PCWSTR szOriginalUnicodeMessage, size_t resultM
     }
 
     StringCbPrintfA(rendered, cbSizeOfRenderedMessage, szHtmlTemplate, szOriginalUnicodeMessage);
-    return rendered;
+    return rendered;*/
 }

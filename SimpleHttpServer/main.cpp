@@ -11,7 +11,6 @@
 #include "simple_http_server.h"
 #include "Utils.h"
 
-DestroyObjectOnCall signalHandlerGlobal;
 SimpleHttpServer* myServerGlobal=NULL;
 
 void ConsoleLogger(PCWSTR szMessage)
@@ -41,13 +40,11 @@ int __cdecl wmain(
     typedef void (*SignalHandlerPointer)(int);
     SignalHandlerPointer previousHandler;
     {
-        PCWSTR serverRoot = const_cast<PCWSTR>(L"C:\\Users\\amitb\\\Downloads\\");
+        PCWSTR serverRoot = const_cast<PCWSTR>(L"C:\\Users\\amitb\\Downloads\\");
         SimpleHttpServer myserver(L"http://127.0.0.1", 80, serverRoot, ConsoleLogger);
         ::myServerGlobal = &myserver;
         previousHandler = signal(SIGINT, SignalHandler);
         myserver.fnStart();
-    end:
-        (void)0;
     }
     
 }

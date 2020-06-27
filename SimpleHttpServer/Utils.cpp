@@ -1,6 +1,9 @@
 #include "Utils.h"
 #include <signal.h>
 #include <iostream>
+#include <vector>
+
+
 size_t fnGetWStringLength(PCWSTR szString, size_t maxSize)
 {
 	size_t result;
@@ -41,36 +44,4 @@ PWSTR convertCSTR(PCSTR sString, DWORD cbBytesInString)
 	return sNewString;
 }
 
-DestroyObjectOnCall::DestroyObjectOnCall()
-	:m_lpObject(NULL)
-{
-}
 
-DestroyObjectOnCall::DestroyObjectOnCall(LPVOID lpObject)
-	:m_lpObject(lpObject)
-{
-
-}
-
-DestroyObjectOnCall::DestroyObjectOnCall(DestroyObjectOnCall&& other)
-	: m_lpObject(other.m_lpObject)
-{
-	other.m_lpObject = NULL;
-}
-
-DestroyObjectOnCall& DestroyObjectOnCall::operator=(DestroyObjectOnCall&& other)
-{
-	m_lpObject = other.m_lpObject;
-	other.m_lpObject = NULL;
-	return *this;
-}
-
-
-void DestroyObjectOnCall::OnCall(int sigValue)const {
-	if (SIGINT == sigValue &&
-		(NULL != m_lpObject))
-	{
-		delete m_lpObject;
-	}
-	
-}

@@ -3,7 +3,6 @@
 #include <vector>
 #include <windows.h>
 
-void add_string_to_vector(const std::wstring& str, std::vector<char>& buffer, unsigned int offset);
 
 class DirectroyIterator {
 public:
