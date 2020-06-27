@@ -132,10 +132,10 @@ PathIdentifier::StringBuffer PathIdentifier::directory_handler() const
 		}
 
 		offset_to_append = total_bytes_read;
-		add_string_to_vector<std::wstring>(file_name, buffer, offset_to_append);
+		add_string_to_vector(file_name, buffer, offset_to_append);
 
 		offset_to_append = total_bytes_read + file_name.size() * sizeof(WCHAR);
-		add_string_to_vector<std::wstring>(L"\n", buffer, offset_to_append);
+		add_string_to_vector(L"\n", buffer, offset_to_append);
 		total_bytes_read += size_going_to_be_written;
 	
 	}

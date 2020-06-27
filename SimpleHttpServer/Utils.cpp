@@ -44,4 +44,19 @@ PWSTR convertCSTR(PCSTR sString, DWORD cbBytesInString)
 	return sNewString;
 }
 
+void add_string_to_vector(const std::wstring& str, std::vector<char>& buffer, unsigned int offset)
+{
+	CopyMemory(
+		buffer.data() + offset,
+		str.data(),
+		str.size() * sizeof(WCHAR));
+}
 
+
+void add_string_to_vector(const std::string& str, std::vector<char>& buffer, unsigned int offset)
+{
+	CopyMemory(
+		buffer.data() + offset,
+		str.data(),
+		str.size());
+}

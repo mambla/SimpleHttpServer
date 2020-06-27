@@ -57,6 +57,21 @@ PCWSTR formatDomainName(PCWSTR szDomainName, DWORD dwPort)
     return NULL;
 }
 
+//*** PATCH ***
+// DO NOT REVIEW. (FOR MEANTIME)
+PWSTR string_to_allocated_buffer(const std::wstring& str)
+{
+    unsigned long buffer_size = str.size() * sizeof(WCHAR);
+    PWSTR buffer = static_cast<PWSTR>(fnAllocate(buffer_size));
+    if (buffer != NULL) {
+        CopyMemory(buffer, str.data(), buffer_size);
+    }
+
+    return buffer;
+
+}
+
+
 SimpleHttpServer::SimpleHttpServer(PCWSTR szDomainName, DWORD dwPort, PCWSTR szServerRootPath, fpLogger lpfnLoggerFunction)
 	:m_dwPort(dwPort),
 	m_szDomainName(formatDomainName(szDomainName, dwPort)),
@@ -136,7 +151,6 @@ void SimpleHttpServer::fnStart()
                 fnHandleRequest((PHTTP_REQUEST)lpRequestBuffer);
 
             if (NULL != sTextResponse) {
-                //fnSendAsResponseFregmented(sTextResponse, lpRequestBuffer);
                 fnSendResponse(sTextResponse, lpRequestBuffer);
                 HeapFree(GetProcessHeap(), 0, (LPVOID)sTextResponse);
             }
@@ -252,19 +266,6 @@ PCWSTR SimpleHttpServer::fnHandleRequest(LPVOID pDataStructure)
     }
 }
 
-//*** PATCH ***
-// DO NOT REVIEW. (FOR MEANTIME)
-PWSTR string_to_allocated_buffer(const std::wstring& str)
-{
-    unsigned long buffer_size = str.size() * sizeof(WCHAR);
-    PWSTR buffer = static_cast<PWSTR>(fnAllocate(buffer_size));
-    if (buffer != NULL) {
-        CopyMemory(buffer, str.data(), buffer_size);
-    }
-
-    return buffer;
-
-}
 
 PCWSTR SimpleHttpServer::fnHandleRequestGet(LPVOID pDataStructure)
 {
@@ -321,12 +322,15 @@ void SimpleHttpServer::fnSendResponse(PCWSTR sTextToSend, LPVOID referenceReques
     PHTTP_REQUEST pReferenceRequest = reinterpret_cast<PHTTP_REQUEST>(referenceRequest);
     DWORD bytesSent;
     HTTP_RESPONSE  response;
+    
     CHUNKS_DATA chunks_data = fnGetResponseChunks(reinterpret_cast<PCSTR>(sTextToSend),
         fnGetWStringSize(sTextToSend, UNLIMITED_STRING),
         m_cbRequestMaxSize);
     ULONG StatusCode = 200;
     INITIALIZE_HTTP_RESPONSE(&response, StatusCode, "OK");
     ADD_KNOWN_HEADER(response, HttpHeaderContentType, "text/html");
+    ADD_KNOWN_HEADER(response, HttpHeaderAcceptEncoding, "UTF-8");
+    ADD_KNOWN_HEADER(response, HttpHeaderContentEncoding, "UTF-8");
 
     if (NULL == chunks_data.numberOfChunks)
     {
@@ -390,26 +394,18 @@ void SimpleHttpServer::shutDown()
 
 PCSTR renderUnicodeToByteStrHtml(const std::wstring& szOriginalUnicodeMessage, size_t resultMaxSize)
 {
-    std::string html_template_start = "<div class=\"text\"><pre>";
-    std::string html_template_end = "</pre></div>";
-    size_t size_of_rendered_nmessage =
+    CHAR szHtmlTemplate[] = "<html><head><meta charset=\"utf-8\"/><pre>%ws</pre></head></html>";
+    DWORD cbSizeOfRenderedMessage =
         szOriginalUnicodeMessage.size() * sizeof(WCHAR)
-        + html_template_end.size()
-        + html_template_start.size();
-    std::vector<char> buffer(size_of_rendered_nmessage);
-    //html_template_start + szOriginalUnicodeMessage 
-    return buffer.data();
-    /*DWORD cbSizeOfRenderedMessage =
-        fnGetWStringSize(szOriginalUnicodeMessage, resultMaxSize)
         + sizeof(szHtmlTemplate) + 1;
 
-       
+
     PCHAR rendered = static_cast<PCHAR>(fnAllocate(cbSizeOfRenderedMessage));
-    if (NULL == rendered || NULL == szOriginalUnicodeMessage)
+    if (NULL == rendered || NULL == szOriginalUnicodeMessage.data())
     {
         return NULL;
     }
 
-    StringCbPrintfA(rendered, cbSizeOfRenderedMessage, szHtmlTemplate, szOriginalUnicodeMessage);
-    return rendered;*/
+    StringCbPrintfA(rendered, cbSizeOfRenderedMessage, szHtmlTemplate, szOriginalUnicodeMessage.c_str());
+    return rendered;
 }
