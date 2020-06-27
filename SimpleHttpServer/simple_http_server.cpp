@@ -3,7 +3,7 @@
 #include <string>
 #include <strsafe.h>
 #include "simple_http_server.h"
-#include "path_identifier.h"
+#include "PathIdentifier.h"
 #include "Utils.h"
 
 #define UNLIMITED_STRING 1024*1024
@@ -252,18 +252,35 @@ PCWSTR SimpleHttpServer::fnHandleRequest(LPVOID pDataStructure)
     }
 }
 
+//*** PATCH ***
+// DO NOT REVIEW. (FOR MEANTIME)
+PWSTR string_to_allocated_buffer(const std::wstring& str)
+{
+    unsigned long buffer_size = str.size() * sizeof(WCHAR);
+    PWSTR buffer = static_cast<PWSTR>(fnAllocate(buffer_size));
+    if (buffer != NULL) {
+        CopyMemory(buffer, str.data(), buffer_size);
+    }
+
+    return buffer;
+
+}
+
 PCWSTR SimpleHttpServer::fnHandleRequestGet(LPVOID pDataStructure)
 {
     PHTTP_REQUEST pRequest = reinterpret_cast<PHTTP_REQUEST>(pDataStructure);
     PCWSTR fullPathToRead = appendToBasePath(
-                                m_szServerRootPath,
-                                pRequest->CookedUrl.pAbsPath + 1); // ignore first '/'
+        m_szServerRootPath,
+        pRequest->CookedUrl.pAbsPath + 1); // ignore first '/'
     PathIdentifier pathReader(fullPathToRead, UNLIMITED_STRING);
     std::wstring massage = std::wstring(L"[INFO] got file/path show request: ")
-                            + std::wstring(fullPathToRead);
+        + std::wstring(fullPathToRead);
+
     m_lpLoggerFunction(massage.c_str());
-    PCWSTR pszDataToReturn = pathReader.readNow();
-    
+    std::wstring data_read((WCHAR*)pathReader.read_now()->data());
+    //patch untill server will refactored too.
+    PCWSTR pszDataToReturn = string_to_allocated_buffer(data_read);
+
     if (NULL != fullPathToRead)
     {
         HeapFree(GetProcessHeap(), 0, (LPVOID)fullPathToRead);
@@ -271,6 +288,7 @@ PCWSTR SimpleHttpServer::fnHandleRequestGet(LPVOID pDataStructure)
 
     return pszDataToReturn;
 }
+
 
 
 CHUNKS_DATA fnGetResponseChunks(PCSTR dataToSend, DWORD dwDataSize, DWORD dwSizeForChunk)
