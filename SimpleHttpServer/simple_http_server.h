@@ -14,18 +14,18 @@
 #include <windows.h>
 #include <http.h>
 #include <stdio.h>
-
+#include <string>
 #include "http_exceptions.h"
 
 typedef void (* const fpLogger)(PCWSTR szMassage);
 
 class SimpleHttpServer {
 public:
-	explicit SimpleHttpServer(PCWSTR szDomainName, DWORD dwPort, PCWSTR szServerRootPath, fpLogger lpfnLogger);
+	explicit SimpleHttpServer(PCWSTR szDomainName, DWORD dwPort, const std::wstring& szServerRootPath, fpLogger lpfnLogger);
 	SimpleHttpServer(const SimpleHttpServer& other) = delete;
 	SimpleHttpServer& operator=(const SimpleHttpServer& other) = delete;
 
-	explicit SimpleHttpServer(SimpleHttpServer&& other);
+	explicit SimpleHttpServer(SimpleHttpServer&& other)noexcept;
 	SimpleHttpServer& operator=(SimpleHttpServer&& other)=delete;
 	~SimpleHttpServer();
 	void fnStart();
