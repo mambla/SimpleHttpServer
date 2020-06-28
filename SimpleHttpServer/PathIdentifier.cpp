@@ -67,7 +67,7 @@ PathIdentifier::StringBuffer PathIdentifier::defualt_handler() const
 PathIdentifier::StringBuffer PathIdentifier::file_handler() const
 {
 	static const LPOVERLAPPED DONT_USE_OVERLLAPED = NULL;
-	FileReader file_reader(_abs_path);
+	FileReader file_reader(_abs_path, FILE_SHARE_READ, OPEN_EXISTING);
 	return file_reader.read(_max_size_for_data);
 }
 

@@ -69,7 +69,7 @@ SmartHandleHolder::SmartHandleHolder(HANDLE handle)
 SmartHandleHolder::~SmartHandleHolder()
 {
 	try {
-			CloseHandle(_handle);
+		CloseHandle(_handle);
 	}
 
 	catch (...)
@@ -83,13 +83,14 @@ HANDLE SmartHandleHolder::data()const
 	return _handle;
 }
 
-HANDLE FileReader::get_file_hanler(const std::wstring file_path) // for CR maker: should I return here a unique ptr that usese Win32 API "CloseHandle" function ?
+HANDLE FileReader::get_file_hanler(const std::wstring file_path, DWORD share_mode, DWORD creation_disposition)
 {
-	HANDLE hfile = CreateFileW(file_path.c_str(),
+	HANDLE hfile = CreateFileW(
+		file_path.c_str(),
 		GENERIC_READ,
-		0,
+		share_mode,
 		NULL,
-		OPEN_EXISTING,
+		creation_disposition,
 		FILE_ATTRIBUTE_NORMAL,
 		NULL
 	);
@@ -97,8 +98,8 @@ HANDLE FileReader::get_file_hanler(const std::wstring file_path) // for CR maker
 	return hfile;
 }
 
-FileReader::FileReader(const std::wstring file_path)
-:_file_handler(get_file_hanler(file_path))
+FileReader::FileReader(const std::wstring file_path, DWORD share_mode, DWORD creation_disposition)
+:_file_handler(get_file_hanler(file_path, share_mode, creation_disposition))
 {
 }
 
@@ -131,7 +132,7 @@ FileReader::Buffer FileReader::read(size_t size) const
 		}
 		total_bytes_read += bytes_read;
 	}
-	buffer.resize(total_bytes_read);
 
+	buffer.resize(total_bytes_read);
 	return buffer;
 }

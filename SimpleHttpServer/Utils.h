@@ -45,7 +45,7 @@ class FileReader {
 public:
 	using Buffer = std::vector<char>;
 
-	FileReader(const std::wstring file_path);
+	FileReader(const std::wstring file_path, DWORD share_mode, DWORD creation_disposition);
 	~FileReader();
 
 public:
@@ -58,7 +58,7 @@ public:
 	FileReader& operator=(FileReader& other) = delete;
 
 private:
-	HANDLE get_file_hanler(const std::wstring file_path);
+	HANDLE get_file_hanler(const std::wstring file_path, DWORD share_mode, DWORD creation_disposition);
 
 private:
 	SmartHandleHolder _file_handler;
