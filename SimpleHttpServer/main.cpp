@@ -9,7 +9,6 @@
 #include <string.h>
 #include <signal.h>
 #include "simple_http_server.h"
-#include "Utils.h"
 
 SimpleHttpServer* myServerGlobal=NULL;
 

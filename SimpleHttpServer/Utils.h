@@ -20,22 +20,46 @@ void add_string_to_vector(const std::string& str, std::vector<char>& buffer, uns
 
 void add_string_to_vector(const std::wstring& str, std::vector<char>& buffer, unsigned int offset);
 
-class AutoCloseHandle
+class SmartHandleHolder
 {
 public:
-	AutoCloseHandle(HANDLE handle);
-	~AutoCloseHandle();
+	SmartHandleHolder(HANDLE handle);
+	~SmartHandleHolder();
 
 public:
-	HANDLE data();
+	HANDLE data()const;
 
 public:
-	AutoCloseHandle(const AutoCloseHandle& other) = delete;
-	AutoCloseHandle(AutoCloseHandle&& other) = delete;
-	AutoCloseHandle& operator=(AutoCloseHandle&& other) = delete;
-	AutoCloseHandle& operator=(AutoCloseHandle& other) = delete;
+	SmartHandleHolder(const SmartHandleHolder& other) = delete;
+	SmartHandleHolder(SmartHandleHolder&& other) = delete;
+	SmartHandleHolder& operator=(SmartHandleHolder&& other) = delete;
+	SmartHandleHolder& operator=(SmartHandleHolder& other) = delete;
 
 
 private:
 	HANDLE _handle;
+};
+
+
+class FileReader {
+public:
+	using Buffer = std::vector<char>;
+
+	FileReader(const std::wstring file_path);
+	~FileReader();
+
+public:
+	Buffer read(size_t size)const;
+
+public:
+	FileReader(const FileReader& other) = delete;
+	FileReader(FileReader&& other) = delete;
+	FileReader& operator=(FileReader&& other) = delete;
+	FileReader& operator=(FileReader& other) = delete;
+
+private:
+	HANDLE get_file_hanler(const std::wstring file_path);
+
+private:
+	SmartHandleHolder _file_handler;
 };

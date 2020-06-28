@@ -61,19 +61,77 @@ void add_string_to_vector(const std::string& str, std::vector<char>& buffer, uns
 		str.size());
 }
 
-AutoCloseHandle::AutoCloseHandle(HANDLE handle)
+SmartHandleHolder::SmartHandleHolder(HANDLE handle)
 	:_handle(handle)
 {
 }
 
-AutoCloseHandle::~AutoCloseHandle()
+SmartHandleHolder::~SmartHandleHolder()
 {
-	if (_handle != INVALID_HANDLE_VALUE) {
-		CloseHandle(_handle);
+	try {
+			CloseHandle(_handle);
 	}
+
+	catch (...)
+	{
+	}
+	
 }
 
-HANDLE AutoCloseHandle::data()
+HANDLE SmartHandleHolder::data()const 
 {
 	return _handle;
+}
+
+HANDLE FileReader::get_file_hanler(const std::wstring file_path) // for CR maker: should I return here a unique ptr that usese Win32 API "CloseHandle" function ?
+{
+	HANDLE hfile = CreateFileW(file_path.c_str(),
+		GENERIC_READ,
+		0,
+		NULL,
+		OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL
+	);
+
+	return hfile;
+}
+
+FileReader::FileReader(const std::wstring file_path)
+:_file_handler(get_file_hanler(file_path))
+{
+}
+
+FileReader::~FileReader()
+{
+}
+
+FileReader::Buffer FileReader::read(size_t size) const
+{
+	static const LPOVERLAPPED DONT_USE_OVERLLAPED = NULL;
+	unsigned long total_bytes_read = 0;
+	DWORD bytes_read = 0;
+	bool status=TRUE;
+	Buffer buffer(size);
+
+	while (
+		(total_bytes_read < size)
+		&& status)
+	{
+		status = ReadFile(
+			_file_handler.data(),
+			buffer.data() + total_bytes_read,
+			size,
+			&bytes_read,
+			DONT_USE_OVERLLAPED);
+
+		if (!status || !bytes_read)
+		{
+			break;
+		}
+		total_bytes_read += bytes_read;
+	}
+	buffer.resize(total_bytes_read);
+
+	return buffer;
 }

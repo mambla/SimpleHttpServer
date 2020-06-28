@@ -67,41 +67,8 @@ PathIdentifier::StringBuffer PathIdentifier::defualt_handler() const
 PathIdentifier::StringBuffer PathIdentifier::file_handler() const
 {
 	static const LPOVERLAPPED DONT_USE_OVERLLAPED = NULL;
-	const DWORD chunk_size = _max_size_for_data / 10;
-	DWORD bytes_read = 0;
-	DWORD total_bytes_read = 0;
-	StringBuffer buffer(_max_size_for_data);
-	BOOL status = TRUE;
-	AutoCloseHandle hfile(get_file_hanler());
-
-	while (
-		(total_bytes_read < _max_size_for_data)
-		&& status)
-	{
-		status = ReadFile(
-			hfile.data(),
-			buffer.data() + total_bytes_read,
-			chunk_size,
-			&bytes_read,
-			DONT_USE_OVERLLAPED);
-
-		if (!status || !bytes_read)
-		{
-			break;
-		}
-		total_bytes_read += bytes_read;
-	}
-	buffer.resize(total_bytes_read);
-
-	if (status)
-	{
-		return buffer;
-	}
-
-	else
-	{
-		return _default_empty_data;
-	}
+	FileReader file_reader(_abs_path);
+	return file_reader.read(_max_size_for_data);
 }
 
 PathIdentifier::StringBuffer PathIdentifier::directory_handler() const
@@ -109,9 +76,12 @@ PathIdentifier::StringBuffer PathIdentifier::directory_handler() const
 	static unsigned int SIZE_OF_NEW_LINE_CHARACTER = 2;
 	unsigned int total_bytes_read = 0;
 	StringBuffer buffer(_max_size_for_data);
+	std::wostringstream path_builder;
 	unsigned long offset_to_append = 0;
 	unsigned long size_going_to_be_written = 0;
-	DirectroyIterator iterator(_abs_path + L"\\*");
+
+	path_builder << _abs_path << L"\\*";
+	DirectroyIterator iterator(path_builder.str());
 
 	while (iterator.has_next() && (total_bytes_read < _max_size_for_data))
 	{
