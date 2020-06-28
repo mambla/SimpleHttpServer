@@ -67,20 +67,19 @@ PathIdentifier::StringBuffer PathIdentifier::defualt_handler() const
 PathIdentifier::StringBuffer PathIdentifier::file_handler() const
 {
 	static const LPOVERLAPPED DONT_USE_OVERLLAPED = NULL;
-
 	const DWORD chunk_size = _max_size_for_data / 10;
 	DWORD bytes_read = 0;
 	DWORD total_bytes_read = 0;
 	StringBuffer buffer(_max_size_for_data);
 	BOOL status = TRUE;
-	HANDLE hfile = get_file_hanler();
+	AutoCloseHandle hfile(get_file_hanler());
 
 	while (
 		(total_bytes_read < _max_size_for_data)
 		&& status)
 	{
 		status = ReadFile(
-			hfile,
+			hfile.data(),
 			buffer.data() + total_bytes_read,
 			chunk_size,
 			&bytes_read,
@@ -92,11 +91,9 @@ PathIdentifier::StringBuffer PathIdentifier::file_handler() const
 		}
 		total_bytes_read += bytes_read;
 	}
-
 	buffer.resize(total_bytes_read);
-	CloseHandle(hfile);
 
-	if (status) //why did we get out of the loop
+	if (status)
 	{
 		return buffer;
 	}
@@ -112,12 +109,9 @@ PathIdentifier::StringBuffer PathIdentifier::directory_handler() const
 	static unsigned int SIZE_OF_NEW_LINE_CHARACTER = 2;
 	unsigned int total_bytes_read = 0;
 	StringBuffer buffer(_max_size_for_data);
-	std::wostringstream path_builder;
 	unsigned long offset_to_append = 0;
 	unsigned long size_going_to_be_written = 0;
-
-	path_builder << _abs_path << L"\\*";
-	DirectroyIterator iterator(path_builder.str());
+	DirectroyIterator iterator(_abs_path + L"\\*");
 
 	while (iterator.has_next() && (total_bytes_read < _max_size_for_data))
 	{
@@ -147,8 +141,8 @@ PathIdentifier::StringBuffer PathIdentifier::directory_handler() const
 PathIdentifier::StringBufferPtr PathIdentifier::read_now() const
 {
 	PathIdentifier::PathAttribute path_attribute = get_path_attribute();
-	HandlersMapping path_handlers_mapping = get_path_handlers();
-	MemberFunctionPathHandler selected_handler = path_handlers_mapping[path_attribute];
+	HandlersMapping handlers_mapping = get_path_handlers();
+	MemberFunctionPathHandler selected_handler = handlers_mapping[path_attribute];
 	StringBuffer result_buffer = (this->*selected_handler)();
 	return std::make_shared<StringBuffer>(result_buffer);
 }

@@ -19,3 +19,23 @@ PWSTR convertCSTR(PCSTR sString, DWORD cbBytesInString);
 void add_string_to_vector(const std::string& str, std::vector<char>& buffer, unsigned int offset);
 
 void add_string_to_vector(const std::wstring& str, std::vector<char>& buffer, unsigned int offset);
+
+class AutoCloseHandle
+{
+public:
+	AutoCloseHandle(HANDLE handle);
+	~AutoCloseHandle();
+
+public:
+	HANDLE data();
+
+public:
+	AutoCloseHandle(const AutoCloseHandle& other) = delete;
+	AutoCloseHandle(AutoCloseHandle&& other) = delete;
+	AutoCloseHandle& operator=(AutoCloseHandle&& other) = delete;
+	AutoCloseHandle& operator=(AutoCloseHandle& other) = delete;
+
+
+private:
+	HANDLE _handle;
+};

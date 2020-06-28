@@ -60,3 +60,20 @@ void add_string_to_vector(const std::string& str, std::vector<char>& buffer, uns
 		str.data(),
 		str.size());
 }
+
+AutoCloseHandle::AutoCloseHandle(HANDLE handle)
+	:_handle(handle)
+{
+}
+
+AutoCloseHandle::~AutoCloseHandle()
+{
+	if (_handle != INVALID_HANDLE_VALUE) {
+		CloseHandle(_handle);
+	}
+}
+
+HANDLE AutoCloseHandle::data()
+{
+	return _handle;
+}

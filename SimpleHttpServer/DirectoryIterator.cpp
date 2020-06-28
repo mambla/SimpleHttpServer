@@ -16,9 +16,9 @@ DirectroyIterator::~DirectroyIterator()
 
 DirectroyIterator::StringBuffer DirectroyIterator::get_next()
 {
-	StringBuffer next_file_to_return(_next_file.cFileName);
+	StringBuffer next_file_name_to_return(_next_file.cFileName);
 	_has_next = FindNextFileW(_hfind, &_next_file); //update data for next use.
-	return next_file_to_return;
+	return next_file_name_to_return;
 }
 
 bool DirectroyIterator::has_next()const

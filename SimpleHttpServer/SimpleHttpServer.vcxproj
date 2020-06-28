@@ -152,7 +152,6 @@
     <ClCompile Include="DirectoryIterator.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PathIdentifier.cpp" />
-    <ClCompile Include="path_identifier.cpp" />
     <ClCompile Include="simple_http_server.cpp" />
     <ClCompile Include="Utils.cpp" />
   </ItemGroup>
@@ -160,7 +159,6 @@
     <ClInclude Include="DirectoryIterator.h" />
     <ClInclude Include="http_exceptions.h" />
     <ClInclude Include="PathIdentifier.h" />
-    <ClInclude Include="path_identifier.h" />
     <ClInclude Include="simple_http_server.h" />
     <ClInclude Include="Utils.h" />
   </ItemGroup>

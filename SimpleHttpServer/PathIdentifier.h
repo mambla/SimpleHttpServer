@@ -11,9 +11,9 @@ static DWORD DEFAULT_READ_SIZE = 2028;
 class PathIdentifier
 {
 public:
+	enum class PathAttribute { Directory, File, None };
 	using StringBuffer = std::vector<char>;
 	using StringBufferPtr = std::shared_ptr<StringBuffer>;
-	enum class PathAttribute { Directory, File, None };
 	using MemberFunctionPathHandler = StringBuffer (PathIdentifier::*)(void) const;
 	using HandlersMapping = std::map<PathAttribute, MemberFunctionPathHandler>;
 
@@ -22,13 +22,13 @@ public:
 	~PathIdentifier();
 
 public:
+	StringBufferPtr read_now()const;
+
+public:
 	PathIdentifier(const PathIdentifier& other)=delete;
 	PathIdentifier& operator=(const PathIdentifier& other)=delete;
 	PathIdentifier(PathIdentifier&& other) = delete;
 	PathIdentifier& operator=(PathIdentifier&& other) = delete;
-
-public:
-	StringBufferPtr read_now()const;
 
 private:
 	PathAttribute get_path_attribute() const;
@@ -38,7 +38,7 @@ private:
 	StringBuffer file_handler()const;
 	StringBuffer directory_handler()const;
 	
-
+private:
 	const std::wstring _abs_path;
 	const unsigned int _max_size_for_data;
 	static const StringBuffer _default_empty_data;
